@@ -1,0 +1,53 @@
+services:
+  db:
+    image: mysql:8.4
+    restart: always
+    container_name: kartrack_db
+    environment:
+      MYSQL_DATABASE: cartrack
+      MYSQL_USER: cartrack
+      MYSQL_PASSWORD: cartrack
+      MYSQL_ROOT_PASSWORD: root
+      TZ: America/Sao_Paulo
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  backend:
+    build: ./backend
+    restart: always
+    container_name: kartrack_be
+    env_file:
+      - ./backend/.env
+    environment:
+      DB_HOST: db
+      TZ: America/Sao_Paulo
+    volumes:
+      - ./uploads:/app/uploads
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    image: node:20
+    restart: always
+    container_name: kartrack_fe
+    working_dir: /app
+    command: sh -c "npm install && npm run dev"
+    volumes:
+      - ./frontend:/app
+    ports:
+      - "5173:5173"
+    environment:
+      TZ: America/Sao_Paulo
+    depends_on:
+      - backend

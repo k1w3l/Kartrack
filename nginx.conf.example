@@ -1,0 +1,45 @@
+server {
+    listen 80;
+    server_name seu.dominio.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+
+    server_name seu.dominio.com;
+
+
+    root /var/www/kartrack/dist;
+    index index.html;
+
+    client_max_body_size 20M;
+
+    location /assets/ {
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+        try_files $uri =404;
+    }
+
+    location /uploads/ {
+        alias /root/kartrack/uploads/;
+        expires 7d;
+        add_header Cache-Control "public";
+        try_files $uri =404;
+    }
+
+    location /api/ {
+        proxy_pass http://192.168.1.29:8000/api/;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
