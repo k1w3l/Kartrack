@@ -62,7 +62,7 @@ Sistema web para registrar **abastecimentos, despesas e histórico do veículo**
    ```
 2. Copie o docker-compose.yml:
    ```bash
-   cp bdocker-compose.yml.example docker-compose.yml
+   cp docker-compose.yml.example docker-compose.yml
    ```
 3. Ajuste suas configurações no docker-compose.yml
 
