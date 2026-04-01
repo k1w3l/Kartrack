@@ -65,19 +65,19 @@ Sistema web para registrar **abastecimentos, despesas e histórico do veículo**
    cp bdocker-compose.yml.example docker-compose.yml
    ```
 3. Ajuste suas configurações no docker-compose.yml
-   ```
+
 4. Suba o ambiente:
    ```bash
    docker compose up --build
    ```
 5. Para acessar em ambiente Dev, Home, ajustar o arquivo frontend/vite.config.js com o host local. Verificar arquivo exemplo.
-   ```
+   
 6. Para acesso externo, informar no campo allowedHosts do arquivo rontend/vite.config.js o seu domínio e configurar um proxy reverso para fazer o redirect para os paths /api /uploads. Verificar arquivo exemplo de conf do Nginx. 
-   ```
+   
 7. Acesse:
    - Frontend: http://localhost:5173
    - API: http://localhost:8000/docs
-    ```
+    
 7. Para trocar a marca do sistema, envie os arquivos abaixo para `/app/uploads`:
   - `logo_light.png`: logo usada no tema claro.
   - `logo_dark.png`: logo usada no tema escuro.
