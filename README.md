@@ -51,7 +51,7 @@ services:
       DB_NAME: kartrack
       TZ: America/Sao_Paulo
     volumes:
-      - ./uploads:/app/uploads
+      - ./uploads/vehicles:/app/uploads/vehicles
     ports:
       - "8000:8000"
     depends_on:
@@ -79,7 +79,13 @@ services:
 
 ## Personalização da marca
 
-Coloque os arquivos abaixo no diretório `uploads/` (na mesma pasta do `docker-compose.yml`) para substituir a identidade visual padrão:
+Os arquivos de marca padrão estão embutidos na imagem. Para substituí-los, copie os arquivos para dentro do container e reinicie:
+
+```bash
+docker cp logo_light.png kartrack:/app/uploads/logo_light.png
+docker cp logo_dark.png  kartrack:/app/uploads/logo_dark.png
+docker cp favicon.ico    kartrack:/app/uploads/favicon.ico
+```
 
 - `logo_light.png` — logo exibida no tema claro
 - `logo_dark.png` — logo exibida no tema escuro
