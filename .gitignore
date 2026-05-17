@@ -1,6 +1,9 @@
 # Claude Code
 CLAUDE.md
 
+# Este arquivo
+.gitignore
+
 # Ambiente
 .env
 !.env.example
