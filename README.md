@@ -1,100 +1,104 @@
 # Kartrack (PT-BR)
 
-Sistema web para registrar **abastecimentos, despesas e histórico do veículo**, com frontend moderno (React + Bootstrap), backend FastAPI e banco MySQL, pronto para subir via Docker Compose.
+Sistema web para registrar **abastecimentos, despesas e histórico do veículo**, com frontend moderno (React + Bootstrap), backend FastAPI e banco MySQL.
 
-## Stack
-- **Frontend:** React + Vite + Bootstrap + Chart.js
-- **Backend:** Python + FastAPI + SQLAlchemy + JWT
-- **Banco de dados:** MySQL 8
-- **Infra:** Docker Compose
-- Backend stateless com token JWT
-- Banco em container dedicado
-- Fácil replicação via Docker Compose
-- Separação de camadas pronta para crescer (serviços, filas, cache)
-
-## Funcionalidades principais
+## Funcionalidades
 - Dashboard com métricas em tempo real (polling a cada 10s)
-- Menu com:
-  - Novo abastecimento
-  - Nova despesa
-  - Relatórios
-  - Meu veículo
-  - Registros (importação/exportação CSV)
-  - Configurações
-  - Importação de CSV com filtro por categoria e exportação completa
-  - Integração com a FIPE para atualização do valor do veículo
+- Registro de abastecimentos e despesas por veículo
+- Relatórios e integração com a tabela FIPE para valor de mercado do veículo
+- Importação e exportação de registros via CSV
+- Backup e restauração completa dos dados
+- Suporte a múltiplos veículos e múltiplos usuários (com perfil administrador)
 
-## Segurança e boas práticas
-- Senhas com hash `pbkdf2_sha256` (Passlib)
-- Autenticação JWT
-- Variáveis sensíveis por `.env` (não versionar)
-- CORS e validações via Pydantic
-- Estrutura separada frontend/backend para escalabilidade
-- Inicialização resiliente do backend com espera ativa pelo MySQL (retry automático)
+## Pré-requisitos
 
-## Estrutura de pastas
-```bash
-.
-├── backend/
-│   ├── app/
-│   │   ├── main.py
-│   │   ├── models.py
-│   │   ├── schemas.py
-│   │   ├── auth.py
-│   │   ├── database.py
-│   │   └── config.py
-│   ├── requirements.txt
-│   └── .env
-├── frontend/
-│   ├── src/
-│   │   ├── pages/
-│   │   ├── components/
-│   │   ├── App.jsx
-│   │   └── api.js
-│   └── package.json
-└── docker-compose.yml
+- [Docker](https://docs.docker.com/get-docker/) e [Docker Compose](https://docs.docker.com/compose/)
+
+## Instalação
+
+1. Crie o arquivo `docker-compose.yml` com o conteúdo abaixo e ajuste as variáveis conforme seu ambiente:
+
+```yaml
+services:
+  db:
+    image: mysql:8.4
+    restart: always
+    container_name: kartrack_db
+    environment:
+      MYSQL_DATABASE: kartrack
+      MYSQL_USER: kartrack
+      MYSQL_PASSWORD: kartrack
+      MYSQL_ROOT_PASSWORD: root
+      TZ: America/Sao_Paulo
+    volumes:
+      - ./data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  app:
+    image: kiwel/kartrack:v1
+    restart: always
+    container_name: kartrack
+    environment:
+      SECRET_KEY: troque-esta-chave
+      DB_HOST: db
+      DB_USER: kartrack
+      DB_PASSWORD: kartrack
+      DB_NAME: kartrack
+      TZ: America/Sao_Paulo
+    volumes:
+      - ./uploads:/app/uploads
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
 ```
 
-## Instalação rápida
-1. Copie as variáveis de ambiente do backend:
+2. Suba o ambiente:
    ```bash
-   cp backend/.env.example backend/.env
-   ```
-2. Copie o docker-compose.yml:
-   ```bash
-   cp docker-compose.yml.example docker-compose.yml
-   ```
-3. Ajuste suas configurações no docker-compose.yml
-   
-4. Copie o docker-compose.yml:
-   ```bash
-   cp frontend/vite.config.js.example frontend/vite.config.js
-   ```
-5. Para acessar em ambiente Dev, Home, ajustar o arquivo frontend/vite.config.js com o host onde o sistema vai rodar.
-  
-6. Para acesso externo, informar no campo allowedHosts do arquivo rontend/vite.config.js o seu domínio e configurar um proxy reverso para fazer o redirect para os paths /api /uploads. Verificar arquivo exemplo de conf do Nginx. 
-
-7. Suba o ambiente:
-   ```bash
-   docker compose up --build
-   ```
-8. Acesse:
-   - Frontend: http://localhost:5173
-   - API: http://localhost:8000/docs
-    
-9. Para trocar a marca do sistema, envie os arquivos abaixo para `/app/uploads`:
-  - `logo_light.png`: logo usada no tema claro.
-  - `logo_dark.png`: logo usada no tema escuro.
-  - `favicon.ico`: ícone do navegador.
-- Após substituir os arquivos, recarregue o frontend para aplicar os novos logos e favicon.
+   docker compose up -d
    ```
 
-## Fluxo de uso
-### Primeira instalação
-1. Entrar na tela inicial e clicar em **Primeiro acesso? Criar conta**.
-2. Após login, abrir **Meu veículo** e cadastrar o primeiro veículo.
-3. Ir em **Registros** e importar CSV (opcional).
+3. Acesse: **http://localhost:8000**
 
-### Demais acessos
-1. Fazer login.
-2. O sistema carrega automaticamente usuário e veículo principal.
+## Variáveis de ambiente do serviço `app`
+
+| Variável       | Descrição                                 | Padrão        |
+|----------------|-------------------------------------------|---------------|
+| `SECRET_KEY`   | Chave secreta para assinatura dos tokens JWT — **altere em produção** | `change-me` |
+| `DB_HOST`      | Host do banco de dados                    | `db`          |
+| `DB_USER`      | Usuário do banco                          | `cartrack`    |
+| `DB_PASSWORD`  | Senha do banco                            | `cartrack`    |
+| `DB_NAME`      | Nome do banco                             | `cartrack`    |
+| `DB_PORT`      | Porta do banco                            | `3306`        |
+
+## Personalização da marca
+
+Coloque os arquivos abaixo no diretório `uploads/` (na mesma pasta do `docker-compose.yml`) para substituir a identidade visual padrão:
+
+- `logo_light.png` — logo exibida no tema claro
+- `logo_dark.png` — logo exibida no tema escuro
+- `favicon.ico` — ícone do navegador
+
+Recarregue a página após substituir.
+
+## Acesso externo
+
+Para expor o sistema em um domínio, configure um proxy reverso apontando para a porta `8000`. O serviço responde em um único ponto:
+
+| Caminho      | Conteúdo                          |
+|--------------|-----------------------------------|
+| `/api/*`     | API REST                          |
+| `/uploads/*` | Arquivos estáticos (fotos, logos) |
+| `/*`         | Interface web (SPA React)         |
+
+## Primeiro acesso
+
+1. Abra o sistema e clique em **Primeiro acesso? Criar conta** — o primeiro usuário cadastrado torna-se administrador.
+2. Após login, acesse **Meu veículo** e cadastre seu veículo.
+3. (Opcional) Vá em **Registros** para importar um CSV com histórico existente.

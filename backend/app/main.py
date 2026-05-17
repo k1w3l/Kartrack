@@ -1186,3 +1186,8 @@ def system_restore(payload: dict = Body(...), db: Session = Depends(get_db), cur
 
     db.commit()
     return {"ok": True}
+
+
+_frontend_dist = Path("frontend/dist")
+if _frontend_dist.exists():
+    app.mount("/", StaticFiles(directory=str(_frontend_dist), html=True), name="frontend")

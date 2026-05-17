@@ -1,19 +1,24 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+const backendUrl = process.env.BACKEND_URL || 'http://localhost:8000'
+const allowedHosts = process.env.ALLOWED_HOST
+  ? process.env.ALLOWED_HOST.split(',').map((h) => h.trim())
+  : 'all'
+
 export default defineConfig({
   plugins: [react()],
   server: {
     host: true,
-    allowedHosts: ['seu.dominio.com'],
+    allowedHosts,
     proxy: {
       '/api': {
-        target: 'http://192.168.1.xx:8000',
+        target: backendUrl,
         changeOrigin: true,
         secure: false,
       },
       '/uploads': {
-        target: 'http://192.168.1.xx:8000',
+        target: backendUrl,
         changeOrigin: true,
         secure: false,
       },
