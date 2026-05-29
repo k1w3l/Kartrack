@@ -24,6 +24,13 @@ export default function App() {
   const apiOrigin = API_BASE_URL.replace(/\/api\/?$/, '')
 
   useEffect(() => {
+    const el = document.documentElement
+    el.classList.toggle('theme-dark', darkMode)
+    el.classList.toggle('theme-light', !darkMode)
+    el.setAttribute('data-bs-theme', darkMode ? 'dark' : 'light')
+  }, [darkMode])
+
+  useEffect(() => {
     const pageTitles = {
       '/': 'Kartrack | Timeline',
       '/abastecimento': 'Kartrack | Novo abastecimento',
@@ -133,7 +140,7 @@ export default function App() {
         <Route path="/" element={<DashboardPage vehicleId={vehicleId} currentVehicle={currentVehicle} />} />
         <Route path="/abastecimento" element={<FuelPage vehicleId={vehicleId} />} />
         <Route path="/despesa" element={<ExpensePage vehicleId={vehicleId} />} />
-        <Route path="/relatorios" element={<ReportsPage vehicleId={vehicleId} />} />
+        <Route path="/relatorios" element={<ReportsPage vehicleId={vehicleId} darkMode={darkMode} />} />
         <Route path="/veiculo" element={<VehiclePage onSaved={loadUser} activeVehicleId={vehicleId} setActiveVehicleId={setVehicleId} />} />
         <Route path="/backup-restore" element={<BackupRestorePage vehicleId={vehicleId} />} />
         <Route path="/registros" element={<RecordsPage vehicleId={vehicleId} />} />

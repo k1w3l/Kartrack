@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import api, { API_BASE_URL } from '../api'
+import { useUI } from '../components/UIProvider'
 
 const emptyForm = {
   id: null,
@@ -21,6 +22,9 @@ const emptyForm = {
 }
 
 export default function VehiclePage({ onSaved, activeVehicleId, setActiveVehicleId }) {
+  const { confirm, toast } = useUI()
+  const [submitting, setSubmitting] = useState(false)
+  const [syncingId, setSyncingId] = useState(null)
   const [vehicles, setVehicles] = useState([])
   const [form, setForm] = useState(emptyForm)
   const [selectedPhotoFile, setSelectedPhotoFile] = useState(null)
@@ -106,8 +110,9 @@ export default function VehiclePage({ onSaved, activeVehicleId, setActiveVehicle
 
   const submit = async (e) => {
     e.preventDefault()
+    if (submitting) return
     if (!form.fipe_brand_id || !form.fipe_model_id || !form.fipe_year_code) {
-      alert('Selecione Marca, Modelo e Ano/combustível para consultar a FIPE.')
+      toast.warning('Selecione Marca, Modelo e Ano/combustível para consultar a FIPE.')
       return
     }
     const payload = {
@@ -127,27 +132,35 @@ export default function VehiclePage({ onSaved, activeVehicleId, setActiveVehicle
       fipe_reference: form.fipe_reference || null,
     }
 
-    let savedVehicle
-    if (form.id) {
-      const { data } = await api.put(`/vehicles/${form.id}`, payload)
-      savedVehicle = data
-    } else {
-      const { data } = await api.post('/vehicles', payload)
-      savedVehicle = data
-    }
+    setSubmitting(true)
+    try {
+      let savedVehicle
+      if (form.id) {
+        const { data } = await api.put(`/vehicles/${form.id}`, payload)
+        savedVehicle = data
+      } else {
+        const { data } = await api.post('/vehicles', payload)
+        savedVehicle = data
+      }
 
-    if (selectedPhotoFile && savedVehicle?.id) {
-      const fd = new FormData()
-      fd.append('file', selectedPhotoFile)
-      const { data } = await api.post(`/vehicles/${savedVehicle.id}/photo`, fd)
-      savedVehicle = data
-    }
+      if (selectedPhotoFile && savedVehicle?.id) {
+        const fd = new FormData()
+        fd.append('file', selectedPhotoFile)
+        const { data } = await api.post(`/vehicles/${savedVehicle.id}/photo`, fd)
+        savedVehicle = data
+      }
 
-    if (savedVehicle?.id) setActiveVehicleId?.(Number(savedVehicle.id))
-    setForm(emptyForm)
-    setSelectedPhotoFile(null)
-    await loadVehicles()
-    onSaved?.()
+      if (savedVehicle?.id) setActiveVehicleId?.(Number(savedVehicle.id))
+      setForm(emptyForm)
+      setSelectedPhotoFile(null)
+      await loadVehicles()
+      onSaved?.()
+      toast.success(form.id ? 'Veículo atualizado.' : 'Veículo cadastrado.')
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Não foi possível salvar o veículo.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const setDefault = async (id) => {
@@ -157,8 +170,10 @@ export default function VehiclePage({ onSaved, activeVehicleId, setActiveVehicle
   }
 
   const removeVehicle = async (id) => {
-    if (!window.confirm('Deseja excluir este veículo? Esta ação remove também abastecimentos e despesas vinculadas.')) return
+    const ok = await confirm({ title: 'Excluir veículo', message: 'Deseja excluir este veículo? Esta ação remove também abastecimentos e despesas vinculadas.', confirmLabel: 'Excluir', danger: true })
+    if (!ok) return
     await api.delete(`/vehicles/${id}`)
+    toast.success('Veículo excluído.')
     await loadVehicles()
     if (Number(activeVehicleId) === Number(id)) {
       const { data } = await api.get('/vehicles')
@@ -205,8 +220,8 @@ export default function VehiclePage({ onSaved, activeVehicleId, setActiveVehicle
                     <button type="button" className="btn btn-sm btn-outline-secondary vehicle-action-btn" onClick={() => loadToEdit(vehicle)} title="Editar">
                       <i className="fa-solid fa-pen-to-square me-1" /><span className="action-text">Editar</span>
                     </button>
-                    <button type="button" className="btn btn-sm btn-outline-success vehicle-action-btn" onClick={async () => { await api.post(`/vehicles/${vehicle.id}/fipe-sync`); await loadVehicles(); onSaved?.() }} title="Atualizar FIPE">
-                      <i className="fa-solid fa-arrows-rotate me-1" /><span className="action-text">FIPE</span>
+                    <button type="button" className="btn btn-sm btn-outline-success vehicle-action-btn" disabled={syncingId === vehicle.id} onClick={async () => { setSyncingId(vehicle.id); try { await api.post(`/vehicles/${vehicle.id}/fipe-sync`); await loadVehicles(); onSaved?.(); toast.success('Valor FIPE atualizado.') } catch (err) { toast.error(err?.response?.data?.detail || 'Falha ao atualizar a FIPE.') } finally { setSyncingId(null) } }} title="Atualizar FIPE">
+                      <i className={`fa-solid ${syncingId === vehicle.id ? 'fa-spinner fa-spin' : 'fa-arrows-rotate'} me-1`} /><span className="action-text">FIPE</span>
                     </button>
                     {vehicle.id !== activeVehicleId && (
                       <button type="button" className="btn btn-sm btn-outline-primary vehicle-action-btn" onClick={() => setDefault(vehicle.id)} title="Selecionar veículo">
@@ -279,7 +294,9 @@ export default function VehiclePage({ onSaved, activeVehicleId, setActiveVehicle
 
         </div>
         <div className="mt-3 d-flex gap-2">
-          <button type="submit" className="btn btn-primary"><i className="fa-solid fa-floppy-disk me-2" />Salvar veículo</button>
+          <button type="submit" className="btn btn-primary" disabled={submitting}>
+            {submitting ? <><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />Salvando...</> : <><i className="fa-solid fa-floppy-disk me-2" />Salvar veículo</>}
+          </button>
           {form.id && (
             <button
               type="button"

@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../api'
+import { useUI } from '../components/UIProvider'
 
 const COMBUSTIVEIS_PADRAO = ['Gasolina Comum', 'Gasolina Aditivada', 'Gasolina Podium', 'Diesel', 'Etanol']
 const BANDEIRAS_PADRAO = ['Ipiranga', 'SIM', 'BR', 'Shell', 'Outros']
 
 export default function FuelPage({ vehicleId }) {
   const navigate = useNavigate()
+  const { confirm, toast } = useUI()
+  const [submitting, setSubmitting] = useState(false)
   const [searchParams] = useSearchParams()
   const editId = searchParams.get('edit')
   const cloneId = searchParams.get('clone')
@@ -111,6 +114,7 @@ export default function FuelPage({ vehicleId }) {
 
   const submit = async (e) => {
     e.preventDefault()
+    if (submitting) return
     const dataIso = form.data
 
     const payload = {
@@ -125,10 +129,17 @@ export default function FuelPage({ vehicleId }) {
       vehicle_id: vehicleId,
     }
 
-    if (isEditing) await api.put(`/fuel/${editId}`, payload)
-    else await api.post('/fuel', payload)
-    restoreTimelineFilters()
-    navigate(returnPath ? decodeURIComponent(returnPath) : '/')
+    setSubmitting(true)
+    try {
+      if (isEditing) await api.put(`/fuel/${editId}`, payload)
+      else await api.post('/fuel', payload)
+      toast.success(isEditing ? 'Abastecimento atualizado.' : 'Abastecimento salvo.')
+      restoreTimelineFilters()
+      navigate(returnPath ? decodeURIComponent(returnPath) : '/')
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Não foi possível salvar o abastecimento.')
+      setSubmitting(false)
+    }
   }
 
   const handleCancel = () => {
@@ -137,8 +148,11 @@ export default function FuelPage({ vehicleId }) {
   }
 
   const deleteCurrent = async () => {
-    if (!editId || !window.confirm('Deseja excluir este abastecimento?')) return
+    if (!editId) return
+    const ok = await confirm({ title: 'Excluir abastecimento', message: 'Deseja excluir este abastecimento?', confirmLabel: 'Excluir', danger: true })
+    if (!ok) return
     await api.delete(`/fuel/${editId}`)
+    toast.success('Abastecimento excluído.')
     restoreTimelineFilters()
     navigate(returnPath ? decodeURIComponent(returnPath) : '/')
   }
@@ -150,24 +164,26 @@ export default function FuelPage({ vehicleId }) {
       <h4><i className="fa-solid fa-gas-pump me-2" />{isEditing ? 'Editar abastecimento' : cloneId ? 'Clonar abastecimento' : 'Novo abastecimento'}</h4>
       <div className="row g-2">
         <Field label="Data" icon="fa-regular fa-calendar-days"><input className="form-control" type="date" value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} required /></Field>
-        <Field label="Quilometragem do abastecimento" icon="fa-solid fa-road"><input className="form-control" value={form.quilometragem} onChange={(e) => setForm({ ...form, quilometragem: e.target.value })} required /></Field>
-        <Field label="Tipo de combustível" icon="fa-solid fa-oil-can"><select className="form-select" value={form.tipo_combustivel} onChange={(e) => setForm({ ...form, tipo_combustivel: e.target.value })}>{combustiveis.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}</select><button type="button" className="btn btn-link btn-sm mt-1 px-0" onClick={() => setShowNovoCombustivel((v) => !v)}>{showNovoCombustivel ? 'Cancelar novo combustível' : 'Cadastrar novo combustível'}</button>{showNovoCombustivel && <div className="d-flex gap-2 mt-1"><input className="form-control form-control-sm" value={novoCombustivel} onChange={(e) => setNovoCombustivel(e.target.value)} placeholder="Ex.: GNV" /><button type="button" className="btn btn-sm btn-outline-primary" onClick={async () => { const value = novoCombustivel.trim(); if (!value) return; try { await api.post('/lookup', { category: 'fuel_type', value }); await loadCombustiveis(); setForm((prev) => ({ ...prev, tipo_combustivel: value })); setNovoCombustivel(''); setShowNovoCombustivel(false) } catch { alert('Combustível já cadastrado.') } }}>Adicionar</button></div>}</Field>
-        <Field label="Litros abastecidos" icon="fa-solid fa-droplet"><input className="form-control" value={form.litros} onChange={(e) => setForm({ ...form, litros: e.target.value })} required /></Field>
-        <Field label="Valor total" icon="fa-solid fa-money-bill-wave"><input className="form-control" value={form.valor_total} onChange={(e) => setForm({ ...form, valor_total: e.target.value })} required /></Field>
+        <Field label="Quilometragem do abastecimento" icon="fa-solid fa-road"><input className="form-control" type="number" inputMode="numeric" min="0" value={form.quilometragem} onChange={(e) => setForm({ ...form, quilometragem: e.target.value })} required /></Field>
+        <Field label="Tipo de combustível" icon="fa-solid fa-oil-can"><select className="form-select" value={form.tipo_combustivel} onChange={(e) => setForm({ ...form, tipo_combustivel: e.target.value })}>{combustiveis.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}</select><button type="button" className="btn btn-link btn-sm mt-1 px-0" onClick={() => setShowNovoCombustivel((v) => !v)}>{showNovoCombustivel ? 'Cancelar novo combustível' : 'Cadastrar novo combustível'}</button>{showNovoCombustivel && <div className="d-flex gap-2 mt-1"><input className="form-control form-control-sm" value={novoCombustivel} onChange={(e) => setNovoCombustivel(e.target.value)} placeholder="Ex.: GNV" /><button type="button" className="btn btn-sm btn-outline-primary" onClick={async () => { const value = novoCombustivel.trim(); if (!value) return; try { await api.post('/lookup', { category: 'fuel_type', value }); await loadCombustiveis(); setForm((prev) => ({ ...prev, tipo_combustivel: value })); setNovoCombustivel(''); setShowNovoCombustivel(false) } catch { toast.error('Combustível já cadastrado.') } }}>Adicionar</button></div>}</Field>
+        <Field label="Litros abastecidos" icon="fa-solid fa-droplet"><input className="form-control" type="number" inputMode="decimal" min="0" step="0.01" value={form.litros} onChange={(e) => setForm({ ...form, litros: e.target.value })} required /></Field>
+        <Field label="Valor total" icon="fa-solid fa-money-bill-wave"><input className="form-control" type="number" inputMode="decimal" min="0" step="0.01" value={form.valor_total} onChange={(e) => setForm({ ...form, valor_total: e.target.value })} required /></Field>
         <Field label="Tanque cheio" icon="fa-solid fa-gauge-high">
           <div className="form-check mt-2">
             <input className="form-check-input" id="tanque_cheio" type="checkbox" checked={form.tanque_cheio} onChange={(e) => setForm({ ...form, tanque_cheio: e.target.checked })} />
             <label className="form-check-label" htmlFor="tanque_cheio">Marcar quando o abastecimento completar o tanque</label>
           </div>
         </Field>
-        <Field label="Bandeira" icon="fa-solid fa-flag"><select className="form-select" value={form.bandeira} onChange={(e) => setForm({ ...form, bandeira: e.target.value, local: '' })}>{bandeiras.map((bandeira) => <option key={bandeira} value={bandeira}>{bandeira}</option>)}</select><button type="button" className="btn btn-link btn-sm mt-1 px-0" onClick={() => setShowNovaBandeira((v) => !v)}>{showNovaBandeira ? 'Cancelar nova bandeira' : 'Cadastrar nova bandeira'}</button>{showNovaBandeira && <div className="d-flex gap-2 mt-1"><input className="form-control form-control-sm" value={novaBandeira} onChange={(e) => setNovaBandeira(e.target.value)} placeholder="Ex.: Ale" /><button type="button" className="btn btn-sm btn-outline-primary" onClick={async () => { const value = novaBandeira.trim(); if (!value) return; try { await api.post('/lookup', { category: 'fuel_brand', value }); await loadBandeiras(); setForm((prev) => ({ ...prev, bandeira: value, local: '' })); setNovaBandeira(''); setShowNovaBandeira(false) } catch { alert('Bandeira já cadastrada.') } }}>Adicionar</button></div>}</Field>
-        <Field label="Local" icon="fa-solid fa-location-dot"><select className="form-select" value={form.local} onChange={(e) => setForm({ ...form, local: e.target.value })} required><option value="">Selecione o local</option>{locaisUnicos.map((local) => <option key={local} value={local}>{local}</option>)}</select><button type="button" className="btn btn-link btn-sm mt-1 px-0" onClick={() => setShowNovoLocal((v) => !v)}>{showNovoLocal ? 'Cancelar novo local' : 'Cadastrar novo local'}</button>{showNovoLocal && <div className="d-flex gap-2 mt-1"><input className="form-control form-control-sm" value={novoLocal} onChange={(e) => setNovoLocal(e.target.value)} placeholder="Ex.: Avenida Central, 123" /><button type="button" className="btn btn-sm btn-outline-primary" onClick={async () => { const value = novoLocal.trim(); if (!value || !form.bandeira) return; try { await api.post('/lookup', { category: 'fuel_location', value, parent_value: form.bandeira }); await loadLocais(form.bandeira); setForm((prev) => ({ ...prev, local: value })); setNovoLocal(''); setShowNovoLocal(false) } catch { alert('Local já cadastrado para esta bandeira.') } }}>Adicionar</button></div>}</Field>
+        <Field label="Bandeira" icon="fa-solid fa-flag"><select className="form-select" value={form.bandeira} onChange={(e) => setForm({ ...form, bandeira: e.target.value, local: '' })}>{bandeiras.map((bandeira) => <option key={bandeira} value={bandeira}>{bandeira}</option>)}</select><button type="button" className="btn btn-link btn-sm mt-1 px-0" onClick={() => setShowNovaBandeira((v) => !v)}>{showNovaBandeira ? 'Cancelar nova bandeira' : 'Cadastrar nova bandeira'}</button>{showNovaBandeira && <div className="d-flex gap-2 mt-1"><input className="form-control form-control-sm" value={novaBandeira} onChange={(e) => setNovaBandeira(e.target.value)} placeholder="Ex.: Ale" /><button type="button" className="btn btn-sm btn-outline-primary" onClick={async () => { const value = novaBandeira.trim(); if (!value) return; try { await api.post('/lookup', { category: 'fuel_brand', value }); await loadBandeiras(); setForm((prev) => ({ ...prev, bandeira: value, local: '' })); setNovaBandeira(''); setShowNovaBandeira(false) } catch { toast.error('Bandeira já cadastrada.') } }}>Adicionar</button></div>}</Field>
+        <Field label="Local" icon="fa-solid fa-location-dot"><select className="form-select" value={form.local} onChange={(e) => setForm({ ...form, local: e.target.value })} required><option value="">Selecione o local</option>{locaisUnicos.map((local) => <option key={local} value={local}>{local}</option>)}</select><button type="button" className="btn btn-link btn-sm mt-1 px-0" onClick={() => setShowNovoLocal((v) => !v)}>{showNovoLocal ? 'Cancelar novo local' : 'Cadastrar novo local'}</button>{showNovoLocal && <div className="d-flex gap-2 mt-1"><input className="form-control form-control-sm" value={novoLocal} onChange={(e) => setNovoLocal(e.target.value)} placeholder="Ex.: Avenida Central, 123" /><button type="button" className="btn btn-sm btn-outline-primary" onClick={async () => { const value = novoLocal.trim(); if (!value || !form.bandeira) return; try { await api.post('/lookup', { category: 'fuel_location', value, parent_value: form.bandeira }); await loadLocais(form.bandeira); setForm((prev) => ({ ...prev, local: value })); setNovoLocal(''); setShowNovoLocal(false) } catch { toast.error('Local já cadastrado para esta bandeira.') } }}>Adicionar</button></div>}</Field>
         <Field label="Descrição" icon="fa-regular fa-note-sticky" colClass="col-12"><AutoGrowTextarea value={form.descricao} onChange={(value) => setForm({ ...form, descricao: value })} /></Field>
       </div>
       <p className="mt-3"><i className="fa-solid fa-calculator me-2" />Valor do litro: <strong>R$ {valorLitro.toFixed(2)}</strong></p>
       <div className="d-flex gap-2 mt-2 flex-wrap">
-        <button type="submit" className="btn btn-primary"><i className="fa-solid fa-floppy-disk me-2" />Salvar</button>
-        <button type="button" className="btn btn-outline-secondary" onClick={handleCancel}><i className="fa-solid fa-arrow-left me-2" />Cancelar</button>
+        <button type="submit" className="btn btn-primary" disabled={submitting}>
+          {submitting ? <><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />Salvando...</> : <><i className="fa-solid fa-floppy-disk me-2" />Salvar</>}
+        </button>
+        <button type="button" className="btn btn-outline-secondary" onClick={handleCancel} disabled={submitting}><i className="fa-solid fa-arrow-left me-2" />Cancelar</button>
         {isEditing && <button type="button" className="btn btn-outline-danger" onClick={deleteCurrent}><i className="fa-solid fa-trash me-2" />Excluir registro</button>}
       </div>
     </form>

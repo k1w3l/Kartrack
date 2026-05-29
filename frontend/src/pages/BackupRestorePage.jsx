@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import api, { API_BASE_URL } from '../api'
+import Modal from '../components/Modal'
+import { useUI } from '../components/UIProvider'
 
 const BACKUP_KEYS = [
   'cartrack_vehicle_meta', 'cartrack_combustiveis', 'cartrack_bandeiras', 'cartrack_postos',
@@ -18,7 +20,9 @@ function downloadJson(filename, payload) {
 }
 
 export default function BackupRestorePage({ vehicleId }) {
+  const { toast } = useUI()
   const [preview, setPreview] = useState(null)
+  const [confirming, setConfirming] = useState(false)
 
   const importCsv = async (mode, file) => {
     if (!file || !vehicleId) return
@@ -32,7 +36,7 @@ export default function BackupRestorePage({ vehicleId }) {
         const fd = new FormData()
         fd.append('file', file)
         const { data } = await api.post(`/records/import?vehicle_id=${vehicleId}&mode=${mode}`, fd)
-        alert(`Importação concluída (${mode}): ${JSON.stringify(data)}`)
+        toast.success(`Importação concluída (${mode}): ${JSON.stringify(data)}`, { timeout: 6000 })
       },
     })
   }
@@ -69,8 +73,8 @@ export default function BackupRestorePage({ vehicleId }) {
           if (v === null || v === undefined) localStorage.removeItem(k)
           else localStorage.setItem(k, v)
         })
-        alert('Restore concluído com sucesso. A página será recarregada.')
-        window.location.reload()
+        toast.success('Restore concluído com sucesso. A página será recarregada.')
+        setTimeout(() => window.location.reload(), 800)
       },
     })
   }
@@ -124,20 +128,37 @@ export default function BackupRestorePage({ vehicleId }) {
         </div>
       </div>
 
-      {preview && (
-        <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ background: 'rgba(0,0,0,.45)', zIndex: 9999 }}>
-          <div className="card" style={{ width: 'min(560px, 92vw)' }}>
-            <div className="card-body">
-              <h5>{preview.title}</h5>
-              <ul className="mb-3">{preview.rows.map((r) => <li key={r}>{r}</li>)}</ul>
-              <div className="d-flex justify-content-end gap-2">
-                <button type="button" className="btn btn-outline-secondary" onClick={() => setPreview(null)}>Cancelar</button>
-                <button type="button" className="btn btn-primary" onClick={async () => { await preview.action?.(); setPreview(null) }}>Confirmar</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal
+        open={Boolean(preview)}
+        onClose={() => { if (!confirming) setPreview(null) }}
+        title={preview?.title}
+        titleIcon="fa-solid fa-clipboard-check"
+        footer={(
+          <>
+            <button type="button" className="btn btn-outline-secondary" disabled={confirming} onClick={() => setPreview(null)}>Cancelar</button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={confirming}
+              onClick={async () => {
+                setConfirming(true)
+                try {
+                  await preview.action?.()
+                  setPreview(null)
+                } catch (err) {
+                  toast.error(err?.response?.data?.detail || 'Não foi possível concluir a operação.')
+                } finally {
+                  setConfirming(false)
+                }
+              }}
+            >
+              {confirming ? <><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />Processando...</> : 'Confirmar'}
+            </button>
+          </>
+        )}
+      >
+        {preview && <ul className="mb-0">{preview.rows.map((r) => <li key={r}>{r}</li>)}</ul>}
+      </Modal>
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../api'
+import { useUI } from '../components/UIProvider'
 
 const LIST_CATEGORIES = {
   oficinas: 'expense_oficina',
@@ -108,6 +109,8 @@ function parseMaintenanceDescription(description) {
 
 export default function ExpensePage({ vehicleId }) {
   const navigate = useNavigate()
+  const { confirm, toast } = useUI()
+  const [submitting, setSubmitting] = useState(false)
   const [searchParams] = useSearchParams()
   const editId = searchParams.get('edit')
   const cloneId = searchParams.get('clone')
@@ -315,6 +318,7 @@ export default function ExpensePage({ vehicleId }) {
 
   const submit = async (e) => {
     e.preventDefault()
+    if (submitting) return
     const dataIso = form.data
 
     const payload = {
@@ -378,29 +382,39 @@ export default function ExpensePage({ vehicleId }) {
       payload.descricao = form.descricao || 'Registro de KM inicial'
     }
 
-    if (!isEditing && (tipoKey === 'financiamento' || tipoKey === 'seguro') && Number(form.parcelas || 0) > 1 && Number(form.valorParcela || 0) > 0) {
-      const qtd = Number(form.parcelas)
-      const valorParcela = Number(form.valorParcela)
-      for (let i = 0; i < qtd; i += 1) {
-        await api.post('/expenses', { ...payload, data: addMonths(dataIso, i), valor: valorParcela, descricao: `${payload.descricao} • Parcela ${i + 1}/${qtd}` })
+    setSubmitting(true)
+    try {
+      if (!isEditing && (tipoKey === 'financiamento' || tipoKey === 'seguro') && Number(form.parcelas || 0) > 1 && Number(form.valorParcela || 0) > 0) {
+        const qtd = Number(form.parcelas)
+        const valorParcela = Number(form.valorParcela)
+        for (let i = 0; i < qtd; i += 1) {
+          await api.post('/expenses', { ...payload, data: addMonths(dataIso, i), valor: valorParcela, descricao: `${payload.descricao} • Parcela ${i + 1}/${qtd}` })
+        }
+      } else if (!isEditing && form.repetirRegistro && !['manutenção', 'financiamento', 'seguro'].includes(tipoKey)) {
+        const total = Number(form.numeroRepeticoes || 1)
+        for (let i = 0; i < total; i += 1) {
+          await api.post('/expenses', { ...payload, data: addInterval(dataIso, form.frequenciaRepeticao, i) })
+        }
+      } else if (isEditing) {
+        await api.put(`/expenses/${editId}`, payload)
+      } else {
+        await api.post('/expenses', payload)
       }
-    } else if (!isEditing && form.repetirRegistro && !['manutenção', 'financiamento', 'seguro'].includes(tipoKey)) {
-      const total = Number(form.numeroRepeticoes || 1)
-      for (let i = 0; i < total; i += 1) {
-        await api.post('/expenses', { ...payload, data: addInterval(dataIso, form.frequenciaRepeticao, i) })
-      }
-    } else if (isEditing) {
-      await api.put(`/expenses/${editId}`, payload)
-    } else {
-      await api.post('/expenses', payload)
-    }
 
-    goBackToTimeline()
+      toast.success(isEditing ? 'Despesa atualizada.' : 'Despesa salva.')
+      goBackToTimeline()
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Não foi possível salvar a despesa.')
+      setSubmitting(false)
+    }
   }
 
   const deleteCurrent = async () => {
-    if (!editId || !window.confirm('Deseja excluir esta despesa?')) return
+    if (!editId) return
+    const ok = await confirm({ title: 'Excluir despesa', message: 'Deseja excluir esta despesa?', confirmLabel: 'Excluir', danger: true })
+    if (!ok) return
     await api.delete(`/expenses/${editId}`)
+    toast.success('Despesa excluída.')
     goBackToTimeline()
   }
 
@@ -416,7 +430,7 @@ export default function ExpensePage({ vehicleId }) {
         {(tipoKey === 'manutenção' || tipoKey === 'km inicial') && (
           <Field label="Quilometragem do veículo" icon="fa-solid fa-road">
             <div className="d-flex gap-2 align-items-center">
-              <input className="form-control" style={{ maxWidth: 220 }} value={form.quilometragem} onChange={(e) => setForm({ ...form, quilometragem: e.target.value })} />
+              <input className="form-control" style={{ maxWidth: 220 }} type="number" inputMode="numeric" min="0" value={form.quilometragem} onChange={(e) => setForm({ ...form, quilometragem: e.target.value })} />
               {tipoKey === 'manutenção' && <div className="form-check mb-0">
                 <input className="form-check-input" id="desconsiderar-km" type="checkbox" checked={form.desconsiderarKmRegistrada} onChange={(e) => setForm({ ...form, desconsiderarKmRegistrada: e.target.checked })} />
                 <label className="form-check-label" htmlFor="desconsiderar-km">Desconsiderar km registrada</label>
@@ -425,7 +439,7 @@ export default function ExpensePage({ vehicleId }) {
           </Field>
         )}
 
-        {!['financiamento', 'seguro', 'manutenção', 'acessórios', 'estética', 'multa', 'km inicial'].includes(tipoKey) && <Field label="Valor" icon="fa-solid fa-money-bill-wave"><input className="form-control" value={form.valor} onChange={(e) => setForm({ ...form, valor: e.target.value })} required /></Field>}
+        {!['financiamento', 'seguro', 'manutenção', 'acessórios', 'estética', 'multa', 'km inicial'].includes(tipoKey) && <Field label="Valor" icon="fa-solid fa-money-bill-wave"><input className="form-control" type="number" inputMode="decimal" min="0" step="0.01" value={form.valor} onChange={(e) => setForm({ ...form, valor: e.target.value })} required /></Field>}
 
         {tipoKey === 'manutenção' && (
           <>
@@ -447,7 +461,7 @@ export default function ExpensePage({ vehicleId }) {
                     placeholder: 'Ex.: Pastilha de freio',
                   })}
                 </div>
-                <div className="col-md-4"><input className="form-control" placeholder="Valor da peça" value={form.valorPecaItem} onChange={(e) => setForm({ ...form, valorPecaItem: e.target.value })} /></div>
+                <div className="col-md-4"><input className="form-control" type="number" inputMode="decimal" min="0" step="0.01" placeholder="Valor da peça" value={form.valorPecaItem} onChange={(e) => setForm({ ...form, valorPecaItem: e.target.value })} /></div>
                 <div className="col-md-2 d-flex align-items-center maintenance-add-slot">{form.peca && Number(form.valorPecaItem || 0) >= 0 && <button type="button" className="btn btn-sm btn-outline-primary maintenance-add-btn" onClick={addPecaManutencao}>Adicionar</button>}</div>
               </div>
               {!!manutencaoPecas.length && <ListValues items={manutencaoPecas} onRemove={removePecaManutencao} />}
@@ -468,7 +482,7 @@ export default function ExpensePage({ vehicleId }) {
                     placeholder: 'Ex.: Revisão elétrica',
                   })}
                 </div>
-                <div className="col-md-4"><input className="form-control" placeholder="Valor do serviço" value={form.valorServicoItem} onChange={(e) => setForm({ ...form, valorServicoItem: e.target.value })} /></div>
+                <div className="col-md-4"><input className="form-control" type="number" inputMode="decimal" min="0" step="0.01" placeholder="Valor do serviço" value={form.valorServicoItem} onChange={(e) => setForm({ ...form, valorServicoItem: e.target.value })} /></div>
                 <div className="col-md-2 d-flex align-items-center maintenance-add-slot">{form.servico && Number(form.valorServicoItem || 0) >= 0 && <button type="button" className="btn btn-sm btn-outline-primary maintenance-add-btn" onClick={addServicoManutencao}>Adicionar</button>}</div>
               </div>
               {!!manutencaoServicos.length && <ListValues items={manutencaoServicos} onRemove={removeServicoManutencao} />}
@@ -477,8 +491,8 @@ export default function ExpensePage({ vehicleId }) {
             <Field label="Valor do serviços" icon="fa-solid fa-screwdriver-wrench"><input className="form-control" value={totalServicos.toFixed(2)} readOnly /></Field>
 
             <Field label="Descrição dos serviços" icon="fa-regular fa-note-sticky" colClass="col-12"><AutoGrowTextarea value={form.descricaoServico} onChange={(value) => setForm({ ...form, descricaoServico: value })} /></Field>
-            <Field label="Validade em quilometragem" icon="fa-solid fa-gauge-high"><input className="form-control" value={form.validade_km} onChange={(e) => setForm({ ...form, validade_km: e.target.value })} /></Field>
-            <Field label="Validade em dias" icon="fa-regular fa-clock"><input className="form-control" value={form.validade_dias} onChange={(e) => setForm({ ...form, validade_dias: e.target.value })} /></Field>
+            <Field label="Validade em quilometragem" icon="fa-solid fa-gauge-high"><input className="form-control" type="number" inputMode="numeric" min="0" value={form.validade_km} onChange={(e) => setForm({ ...form, validade_km: e.target.value })} /></Field>
+            <Field label="Validade em dias" icon="fa-regular fa-clock"><input className="form-control" type="number" inputMode="numeric" min="0" value={form.validade_dias} onChange={(e) => setForm({ ...form, validade_dias: e.target.value })} /></Field>
             <Field label="Total" icon="fa-solid fa-calculator" colClass="col-12"><input className="form-control" value={totalManutencao.toFixed(2)} readOnly /></Field>
           </>
         )}
@@ -493,14 +507,14 @@ export default function ExpensePage({ vehicleId }) {
             <Field label="Descrição" icon="fa-regular fa-note-sticky"><AutoGrowTextarea value={form.descricao} onChange={(value) => setForm({ ...form, descricao: value })} /></Field>
             <Field label="Status" icon="fa-solid fa-list-check"><select className="form-select" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}><option>A vencer</option><option>Paga</option><option>Recorrida</option></select></Field>
             {form.status === 'A vencer' && <Field label="Vencimento" icon="fa-regular fa-calendar-check"><input className="form-control" type="date" value={form.vencimento} onChange={(e) => setForm({ ...form, vencimento: e.target.value })} /></Field>}
-            <Field label="Valor" icon="fa-solid fa-money-bill-wave" colClass="col-12"><input className="form-control" value={form.valor} onChange={(e) => setForm({ ...form, valor: e.target.value })} /></Field>
+            <Field label="Valor" icon="fa-solid fa-money-bill-wave" colClass="col-12"><input className="form-control" type="number" inputMode="decimal" min="0" step="0.01" value={form.valor} onChange={(e) => setForm({ ...form, valor: e.target.value })} /></Field>
           </>
         )}
 
         {tipoKey === 'financiamento' && (
           <>
-            <Field label="Quantidade de parcelas" icon="fa-solid fa-list-ol"><input className="form-control" value={form.parcelas} onChange={(e) => setForm({ ...form, parcelas: e.target.value })} /></Field>
-            <Field label="Valor da parcela" icon="fa-solid fa-coins"><input className="form-control" value={form.valorParcela} onChange={(e) => setForm({ ...form, valorParcela: e.target.value })} /></Field>
+            <Field label="Quantidade de parcelas" icon="fa-solid fa-list-ol"><input className="form-control" type="number" inputMode="numeric" min="1" step="1" value={form.parcelas} onChange={(e) => setForm({ ...form, parcelas: e.target.value })} /></Field>
+            <Field label="Valor da parcela" icon="fa-solid fa-coins"><input className="form-control" type="number" inputMode="decimal" min="0" step="0.01" value={form.valorParcela} onChange={(e) => setForm({ ...form, valorParcela: e.target.value })} /></Field>
             <Field label="Descrição" icon="fa-regular fa-note-sticky"><AutoGrowTextarea value={form.descricao} onChange={(value) => setForm({ ...form, descricao: value })} /></Field>
             <Field label="Valor do financiamento" icon="fa-solid fa-calculator"><input className="form-control" value={totalParcelado.toFixed(2)} readOnly /></Field>
           </>
@@ -515,8 +529,8 @@ export default function ExpensePage({ vehicleId }) {
           <>
             <Field label="Seguradora" icon="fa-solid fa-shield-halved"><select className="form-select" value={form.seguradora} onChange={(e) => setForm({ ...form, seguradora: e.target.value })}>{seguradoras.map((item) => <option key={item}>{item}</option>)}</select><ToggleCreate show={showNovo.seguradora} onToggle={() => setShowNovo((prev) => ({ ...prev, seguradora: !prev.seguradora }))} addLabel="Cadastrar nova seguradora" cancelLabel="Cancelar" value={novos.seguradora} onChange={(v) => setNovos((prev) => ({ ...prev, seguradora: v }))} onAdd={() => addOption('seguradora')} placeholder="Ex.: Tokio Marine" /></Field>
             <Field label="Classe de bônus" icon="fa-solid fa-star"><input className="form-control" value={form.classeBonus} onChange={(e) => setForm({ ...form, classeBonus: e.target.value })} /></Field>
-            <Field label="Valor da parcela" icon="fa-solid fa-coins"><input className="form-control" value={form.valorParcela} onChange={(e) => setForm({ ...form, valorParcela: e.target.value })} /></Field>
-            <Field label="Quantidade de parcelas" icon="fa-solid fa-list-ol"><input className="form-control" value={form.parcelas} onChange={(e) => setForm({ ...form, parcelas: e.target.value })} /></Field>
+            <Field label="Valor da parcela" icon="fa-solid fa-coins"><input className="form-control" type="number" inputMode="decimal" min="0" step="0.01" value={form.valorParcela} onChange={(e) => setForm({ ...form, valorParcela: e.target.value })} /></Field>
+            <Field label="Quantidade de parcelas" icon="fa-solid fa-list-ol"><input className="form-control" type="number" inputMode="numeric" min="1" step="1" value={form.parcelas} onChange={(e) => setForm({ ...form, parcelas: e.target.value })} /></Field>
             <Field label="Descrição" icon="fa-regular fa-note-sticky"><AutoGrowTextarea value={form.descricao} onChange={(value) => setForm({ ...form, descricao: value })} /></Field>
             <Field label="Valor do seguro" icon="fa-solid fa-calculator" colClass="col-12"><input className="form-control" value={totalParcelado.toFixed(2)} readOnly /></Field>
           </>
@@ -526,7 +540,7 @@ export default function ExpensePage({ vehicleId }) {
           <>
             <Field label="Nome" icon="fa-solid fa-puzzle-piece"><input className="form-control" value={form.nomePeca} onChange={(e) => setForm({ ...form, nomePeca: e.target.value })} /></Field>
             <Field label="Descrição" icon="fa-regular fa-note-sticky"><AutoGrowTextarea value={form.descricao} onChange={(value) => setForm({ ...form, descricao: value })} /></Field>
-            <Field label="Valor" icon="fa-solid fa-money-bill-wave" colClass="col-12"><input className="form-control" value={form.valor} onChange={(e) => setForm({ ...form, valor: e.target.value })} /></Field>
+            <Field label="Valor" icon="fa-solid fa-money-bill-wave" colClass="col-12"><input className="form-control" type="number" inputMode="decimal" min="0" step="0.01" value={form.valor} onChange={(e) => setForm({ ...form, valor: e.target.value })} /></Field>
           </>
         )}
 
@@ -539,7 +553,7 @@ export default function ExpensePage({ vehicleId }) {
           <>
             <Field label="Local" icon="fa-solid fa-sparkles"><select className="form-select" value={form.localEstetica} onChange={(e) => setForm({ ...form, localEstetica: e.target.value })}>{locaisEstetica.map((item) => <option key={item}>{item}</option>)}</select><ToggleCreate show={showNovo.localEstetica} onToggle={() => setShowNovo((prev) => ({ ...prev, localEstetica: !prev.localEstetica }))} addLabel="Cadastrar novo local" cancelLabel="Cancelar" value={novos.localEstetica} onChange={(v) => setNovos((prev) => ({ ...prev, localEstetica: v }))} onAdd={() => addOption('localEstetica')} placeholder="Ex.: Estética da Vila" /></Field>
             <Field label="Descrição" icon="fa-regular fa-note-sticky"><AutoGrowTextarea value={form.descricao} onChange={(value) => setForm({ ...form, descricao: value })} /></Field>
-            <Field label="Valor" icon="fa-solid fa-money-bill-wave" colClass="col-12"><input className="form-control" value={form.valor} onChange={(e) => setForm({ ...form, valor: e.target.value })} /></Field>
+            <Field label="Valor" icon="fa-solid fa-money-bill-wave" colClass="col-12"><input className="form-control" type="number" inputMode="decimal" min="0" step="0.01" value={form.valor} onChange={(e) => setForm({ ...form, valor: e.target.value })} /></Field>
           </>
         )}
 
@@ -553,7 +567,7 @@ export default function ExpensePage({ vehicleId }) {
               </select>
             </Field>
             <Field label="Descrição" icon="fa-regular fa-note-sticky"><AutoGrowTextarea value={form.descricao} onChange={(value) => setForm({ ...form, descricao: value })} /></Field>
-            <Field label="Valor" icon="fa-solid fa-money-bill-wave" colClass="col-12"><input className="form-control" value={form.valor} onChange={(e) => setForm({ ...form, valor: e.target.value })} /></Field>
+            <Field label="Valor" icon="fa-solid fa-money-bill-wave" colClass="col-12"><input className="form-control" type="number" inputMode="decimal" min="0" step="0.01" value={form.valor} onChange={(e) => setForm({ ...form, valor: e.target.value })} /></Field>
           </>
         )}
 
@@ -583,9 +597,11 @@ export default function ExpensePage({ vehicleId }) {
       </div>
 
       <div className="d-flex gap-2 mt-3 flex-wrap">
-        <button type="submit" className="btn btn-primary"><i className="fa-solid fa-floppy-disk me-2" />Salvar</button>
-        <button type="button" className="btn btn-outline-secondary" onClick={handleCancel}><i className="fa-solid fa-arrow-left me-2" />Cancelar</button>
-        {isEditing && <button type="button" className="btn btn-outline-danger" onClick={deleteCurrent}><i className="fa-solid fa-trash me-2" />Excluir registro</button>}
+        <button type="submit" className="btn btn-primary" disabled={submitting}>
+          {submitting ? <><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />Salvando...</> : <><i className="fa-solid fa-floppy-disk me-2" />Salvar</>}
+        </button>
+        <button type="button" className="btn btn-outline-secondary" onClick={handleCancel} disabled={submitting}><i className="fa-solid fa-arrow-left me-2" />Cancelar</button>
+        {isEditing && <button type="button" className="btn btn-outline-danger" onClick={deleteCurrent} disabled={submitting}><i className="fa-solid fa-trash me-2" />Excluir registro</button>}
       </div>
     </form>
   )
