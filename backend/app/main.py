@@ -8,10 +8,12 @@ from pathlib import Path
 from urllib.parse import urlencode
 from urllib.request import urlopen
 
-from fastapi import Body, Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi import Body, Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import StreamingResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -42,13 +44,31 @@ from .schemas import (
     UserPreferencesIn,
 )
 
+def _rate_limit_key(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "anonymous"
+
+
+limiter = Limiter(key_func=_rate_limit_key)
 app = FastAPI(title=settings.app_name)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 UPLOAD_ROOT = Path("uploads")
 VEHICLE_UPLOAD_DIR = UPLOAD_ROOT / "vehicles"
 FIPE_API_BASE = "https://fipe.parallelum.com.br/api/v2"
+ALLOWED_VEHICLE_TYPES = {"cars", "motorcycles", "trucks"}
+ALLOWED_PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
 VEHICLE_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _validate_vehicle_type(vehicle_type: str) -> str:
+    if vehicle_type not in ALLOWED_VEHICLE_TYPES:
+        raise HTTPException(status_code=400, detail="Tipo de veículo inválido")
+    return vehicle_type
 
 
 def _ensure_upload_dirs() -> None:
@@ -92,6 +112,8 @@ def _second_business_day(year: int, month: int) -> date:
 
 def _refresh_vehicle_fipe_if_needed(vehicle: Vehicle, db: Session, force: bool = False) -> None:
     if not vehicle.fipe_brand_id or not vehicle.fipe_model_id or not vehicle.fipe_year_code:
+        return
+    if vehicle.tipo_veiculo not in ALLOWED_VEHICLE_TYPES:
         return
 
     today = date.today()
@@ -196,6 +218,11 @@ def _serialize_vehicle(vehicle: Vehicle) -> dict:
 
 @app.on_event("startup")
 def on_startup() -> None:
+    if settings.secret_key_is_default:
+        raise RuntimeError(
+            "SECRET_KEY não configurada: defina uma chave forte e única em backend/.env "
+            "antes de iniciar a aplicação."
+        )
     _ensure_upload_dirs()
     init_db()
 
@@ -204,7 +231,7 @@ app.mount("/uploads", StaticFiles(directory=str(UPLOAD_ROOT)), name="uploads")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origin_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -250,7 +277,8 @@ def _ensure_lookup_defaults(db: Session, user_id: int, category: str) -> None:
 
 
 @app.post(f"{settings.api_prefix}/auth/register", response_model=UserOut)
-def register(user_in: UserCreate, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def register(request: Request, user_in: UserCreate, db: Session = Depends(get_db)):
     existing = db.query(User).filter(User.email == user_in.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="E-mail já cadastrado")
@@ -268,7 +296,8 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
 
 
 @app.post(f"{settings.api_prefix}/auth/login", response_model=TokenOut)
-def login(payload: LoginInput, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def login(request: Request, payload: LoginInput, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == payload.email).first()
     if not user or not verify_password(payload.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Usuário ou senha inválidos")
@@ -483,8 +512,17 @@ def upload_vehicle_photo(
 ):
     vehicle = _ensure_vehicle(vehicle_id, current_user, db)
     ext = Path(file.filename or "").suffix.lower() or ".jpg"
-    if ext not in {".jpg", ".jpeg", ".png", ".webp", ".gif"}:
+    if ext not in ALLOWED_PHOTO_EXTS:
         raise HTTPException(status_code=400, detail="Formato de imagem não suportado")
+
+    content = file.file.read(settings.max_upload_bytes + 1)
+    if len(content) > settings.max_upload_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Imagem muito grande (máximo {settings.max_upload_bytes // (1024 * 1024)} MB)",
+        )
+    if not content.startswith((b"\xff\xd8\xff", b"\x89PNG\r\n\x1a\n", b"GIF87a", b"GIF89a", b"RIFF")):
+        raise HTTPException(status_code=400, detail="Arquivo enviado não é uma imagem válida")
 
     for old in VEHICLE_UPLOAD_DIR.glob(f"vehicle_{vehicle_id}.*"):
         old.unlink(missing_ok=True)
@@ -492,7 +530,7 @@ def upload_vehicle_photo(
     filename = f"vehicle_{vehicle_id}{ext}"
     target = VEHICLE_UPLOAD_DIR / filename
     with target.open("wb") as f:
-        f.write(file.file.read())
+        f.write(content)
 
     return _serialize_vehicle(vehicle)
 
@@ -512,13 +550,15 @@ def delete_vehicle(
 
 
 @app.get(f"{settings.api_prefix}/fipe/brands", response_model=list[FipeOption])
-def fipe_brands(vehicle_type: str = "cars"):
+def fipe_brands(vehicle_type: str = "cars", current_user: User = Depends(get_current_user)):
+    vehicle_type = _validate_vehicle_type(vehicle_type)
     data = _fipe_get(f"{vehicle_type}/brands")
     return [FipeOption(codigo=str(item.get("code")), nome=item.get("name") or "") for item in data]
 
 
 @app.get(f"{settings.api_prefix}/fipe/models", response_model=list[FipeOption])
-def fipe_models(vehicle_type: str = "cars", brand_id: int = 0):
+def fipe_models(vehicle_type: str = "cars", brand_id: int = 0, current_user: User = Depends(get_current_user)):
+    vehicle_type = _validate_vehicle_type(vehicle_type)
     if not brand_id:
         return []
     data = _fipe_get(f"{vehicle_type}/brands/{brand_id}/models")
@@ -526,7 +566,8 @@ def fipe_models(vehicle_type: str = "cars", brand_id: int = 0):
 
 
 @app.get(f"{settings.api_prefix}/fipe/years", response_model=list[FipeOption])
-def fipe_years(vehicle_type: str = "cars", brand_id: int = 0, model_id: int = 0):
+def fipe_years(vehicle_type: str = "cars", brand_id: int = 0, model_id: int = 0, current_user: User = Depends(get_current_user)):
+    vehicle_type = _validate_vehicle_type(vehicle_type)
     if not brand_id or not model_id:
         return []
     data = _fipe_get(f"{vehicle_type}/brands/{brand_id}/models/{model_id}/years")
@@ -534,7 +575,8 @@ def fipe_years(vehicle_type: str = "cars", brand_id: int = 0, model_id: int = 0)
 
 
 @app.get(f"{settings.api_prefix}/fipe/price")
-def fipe_price(vehicle_type: str = "cars", brand_id: int = 0, model_id: int = 0, year_code: str = ""):
+def fipe_price(vehicle_type: str = "cars", brand_id: int = 0, model_id: int = 0, year_code: str = "", current_user: User = Depends(get_current_user)):
+    vehicle_type = _validate_vehicle_type(vehicle_type)
     if not brand_id or not model_id or not year_code:
         raise HTTPException(status_code=400, detail="Parâmetros FIPE incompletos")
     details = _fipe_get(f"{vehicle_type}/brands/{brand_id}/models/{model_id}/years/{year_code}")

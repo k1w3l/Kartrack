@@ -62,6 +62,13 @@ class VehicleIn(BaseModel):
     fipe_code: str | None = None
     fipe_reference: str | None = None
 
+    @field_validator("tipo_veiculo")
+    @classmethod
+    def validate_tipo_veiculo(cls, value: str) -> str:
+        if value not in {"cars", "motorcycles", "trucks"}:
+            raise ValueError("Tipo de veículo inválido")
+        return value
+
 
 class VehicleOut(VehicleIn):
     id: int

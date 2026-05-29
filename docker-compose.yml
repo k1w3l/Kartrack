@@ -4,17 +4,19 @@ services:
     restart: always
     container_name: kartrack_db
     environment:
-      MYSQL_DATABASE: kartrack
-      MYSQL_USER: kartrack
-      MYSQL_PASSWORD: kartrack
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: ${DB_NAME:-kartrack}
+      MYSQL_USER: ${DB_USER:-kartrack}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD no .env}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?defina DB_ROOT_PASSWORD no .env}
       TZ: America/Sao_Paulo
+    # Porta exposta apenas no localhost (acesso administrativo). Remova esta seção
+    # em produção se não precisar acessar o banco diretamente do host.
     ports:
-      - "3306:3306"
+      - "127.0.0.1:3306:3306"
     volumes:
       - ./data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
       interval: 5s
       timeout: 5s
       retries: 20
