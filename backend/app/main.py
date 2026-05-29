@@ -1,4 +1,5 @@
 from collections import defaultdict
+from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta
 from io import StringIO
 import csv
@@ -51,8 +52,20 @@ def _rate_limit_key(request: Request) -> str:
     return request.client.host if request.client else "anonymous"
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if settings.secret_key_is_default:
+        raise RuntimeError(
+            "SECRET_KEY não configurada: defina uma chave forte e única em backend/.env "
+            "antes de iniciar a aplicação."
+        )
+    _ensure_upload_dirs()
+    init_db()
+    yield
+
+
 limiter = Limiter(key_func=_rate_limit_key)
-app = FastAPI(title=settings.app_name)
+app = FastAPI(title=settings.app_name, lifespan=lifespan)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -214,17 +227,6 @@ def _serialize_vehicle(vehicle: Vehicle) -> dict:
         "fipe_last_sync_at": vehicle.fipe_last_sync_at.isoformat() if vehicle.fipe_last_sync_at else None,
         "foto_url": _vehicle_photo_url(vehicle.id),
     }
-
-
-@app.on_event("startup")
-def on_startup() -> None:
-    if settings.secret_key_is_default:
-        raise RuntimeError(
-            "SECRET_KEY não configurada: defina uma chave forte e única em backend/.env "
-            "antes de iniciar a aplicação."
-        )
-    _ensure_upload_dirs()
-    init_db()
 
 
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_ROOT)), name="uploads")
@@ -473,10 +475,11 @@ def create_vehicle(vehicle_in: VehicleIn, db: Session = Depends(get_db), current
 @app.get(f"{settings.api_prefix}/vehicles", response_model=list[VehicleOut])
 def list_vehicles(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     vehicles = db.query(Vehicle).filter(Vehicle.user_id == current_user.id).all()
+    # A quilometragem é mantida nas rotas de escrita; aqui só verificamos a FIPE
+    # (a checagem é barata e só faz chamada de rede na janela mensal de atualização).
+    # /vehicles é chamado no login e após alterações de veículo, não no polling do dashboard.
     for vehicle in vehicles:
-        _sync_vehicle_odometer(vehicle, db)
         _refresh_vehicle_fipe_if_needed(vehicle, db)
-    vehicles = db.query(Vehicle).filter(Vehicle.user_id == current_user.id).all()
     return [_serialize_vehicle(v) for v in vehicles]
 
 
@@ -701,9 +704,9 @@ def add_fuel(record: FuelIn, db: Session = Depends(get_db), current_user: User =
         valor_total=record.valor_total,
         valor_litro=(record.valor_total / record.litros if record.litros else 0),
     )
-    vehicle.quilometragem_atual = max(vehicle.quilometragem_atual, record.quilometragem)
     db.add(fuel)
     db.commit()
+    _sync_vehicle_odometer(vehicle, db)
     return {"ok": True}
 
 
@@ -719,7 +722,7 @@ def update_fuel(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _ensure_vehicle(record.vehicle_id, current_user, db)
+    vehicle = _ensure_vehicle(record.vehicle_id, current_user, db)
     fuel = _ensure_fuel_record(fuel_id, current_user, db)
 
     for key, value in record.model_dump().items():
@@ -729,14 +732,19 @@ def update_fuel(
     db.add(fuel)
     db.commit()
     db.refresh(fuel)
+    _sync_vehicle_odometer(vehicle, db)
     return fuel
 
 
 @app.delete(f"{settings.api_prefix}/fuel/{'{'}fuel_id{'}'}")
 def delete_fuel(fuel_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     fuel = _ensure_fuel_record(fuel_id, current_user, db)
+    vehicle_id = fuel.vehicle_id
     db.delete(fuel)
     db.commit()
+    vehicle = db.query(Vehicle).filter(Vehicle.id == vehicle_id).first()
+    if vehicle:
+        _sync_vehicle_odometer(vehicle, db)
     return {"ok": True}
 
 
@@ -744,10 +752,9 @@ def delete_fuel(fuel_id: int, db: Session = Depends(get_db), current_user: User 
 def add_expense(record: ExpenseIn, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     vehicle = _ensure_vehicle(record.vehicle_id, current_user, db)
     expense = ExpenseRecord(**record.model_dump())
-    if record.quilometragem:
-        vehicle.quilometragem_atual = max(vehicle.quilometragem_atual, record.quilometragem)
     db.add(expense)
     db.commit()
+    _sync_vehicle_odometer(vehicle, db)
     return {"ok": True}
 
 
@@ -763,7 +770,7 @@ def update_expense(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _ensure_vehicle(record.vehicle_id, current_user, db)
+    vehicle = _ensure_vehicle(record.vehicle_id, current_user, db)
     expense = _ensure_expense_record(expense_id, current_user, db)
 
     for key, value in record.model_dump().items():
@@ -772,14 +779,19 @@ def update_expense(
     db.add(expense)
     db.commit()
     db.refresh(expense)
+    _sync_vehicle_odometer(vehicle, db)
     return expense
 
 
 @app.delete(f"{settings.api_prefix}/expenses/{'{'}expense_id{'}'}")
 def delete_expense(expense_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     expense = _ensure_expense_record(expense_id, current_user, db)
+    vehicle_id = expense.vehicle_id
     db.delete(expense)
     db.commit()
+    vehicle = db.query(Vehicle).filter(Vehicle.id == vehicle_id).first()
+    if vehicle:
+        _sync_vehicle_odometer(vehicle, db)
     return {"ok": True}
 
 
@@ -799,8 +811,6 @@ def confirm_reminder(
 @app.get(f"{settings.api_prefix}/timeline", response_model=list[TimelineItem])
 def timeline(vehicle_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     vehicle = _ensure_vehicle(vehicle_id, current_user, db)
-    _sync_vehicle_odometer(vehicle, db)
-    _refresh_vehicle_fipe_if_needed(vehicle, db)
     fuels = db.query(FuelRecord).filter(FuelRecord.vehicle_id == vehicle_id).all()
     expenses = db.query(ExpenseRecord).filter(ExpenseRecord.vehicle_id == vehicle_id).all()
     fipe_history = db.query(VehicleFipeHistory).filter(VehicleFipeHistory.vehicle_id == vehicle_id).all()
@@ -855,9 +865,6 @@ def timeline(vehicle_id: int, db: Session = Depends(get_db), current_user: User 
 @app.get(f"{settings.api_prefix}/dashboard", response_model=DashboardOut)
 def dashboard(vehicle_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     vehicle = _ensure_vehicle(vehicle_id, current_user, db)
-    _sync_vehicle_odometer(vehicle, db)
-    _refresh_vehicle_fipe_if_needed(vehicle, db)
-    db.refresh(vehicle)
     total_fuel = db.query(func.coalesce(func.sum(FuelRecord.valor_total), 0)).filter(FuelRecord.vehicle_id == vehicle_id).scalar()
     total_exp = db.query(func.coalesce(func.sum(ExpenseRecord.valor), 0)).filter(ExpenseRecord.vehicle_id == vehicle_id).scalar()
 
@@ -910,8 +917,7 @@ def dashboard(vehicle_id: int, db: Session = Depends(get_db), current_user: User
 
 @app.get(f"{settings.api_prefix}/reports", response_model=ReportOut)
 def reports(vehicle_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    vehicle = _ensure_vehicle(vehicle_id, current_user, db)
-    _refresh_vehicle_fipe_if_needed(vehicle, db)
+    _ensure_vehicle(vehicle_id, current_user, db)
     expenses = db.query(ExpenseRecord).filter(ExpenseRecord.vehicle_id == vehicle_id).all()
     fuels = db.query(FuelRecord).filter(FuelRecord.vehicle_id == vehicle_id).all()
 
@@ -932,8 +938,7 @@ def reports(vehicle_id: int, db: Session = Depends(get_db), current_user: User =
 
 @app.get(f"{settings.api_prefix}/fipe/history", response_model=list[FipeHistoryPoint])
 def fipe_history(vehicle_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    vehicle = _ensure_vehicle(vehicle_id, current_user, db)
-    _refresh_vehicle_fipe_if_needed(vehicle, db)
+    _ensure_vehicle(vehicle_id, current_user, db)
     points = (
         db.query(VehicleFipeHistory)
         .filter(VehicleFipeHistory.vehicle_id == vehicle_id)
