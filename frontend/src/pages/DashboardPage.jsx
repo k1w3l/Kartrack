@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api'
 import Modal from '../components/Modal'
+import { Spinner, TimelineSkeleton } from '../components/Loading'
 import { useUI } from '../components/UIProvider'
 
 const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -181,6 +182,7 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
   const { confirm } = useUI()
   const [dashboard, setDashboard] = useState(null)
   const [timeline, setTimeline] = useState([])
+  const [loading, setLoading] = useState(true)
 
   const now = new Date()
   const [month, setMonth] = useState(String(now.getMonth() + 1).padStart(2, '0'))
@@ -199,13 +201,21 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
 
   const load = async () => {
     if (!vehicleId) return
-    const [d, t] = await Promise.all([
-      api.get('/dashboard', { params: { vehicle_id: vehicleId } }),
-      api.get('/timeline', { params: { vehicle_id: vehicleId } }),
-    ])
-    setDashboard(d.data)
-    setTimeline(Array.isArray(t.data) ? t.data.filter((item) => item.tipo_registro !== 'fipe') : [])
+    try {
+      const [d, t] = await Promise.all([
+        api.get('/dashboard', { params: { vehicle_id: vehicleId } }),
+        api.get('/timeline', { params: { vehicle_id: vehicleId } }),
+      ])
+      setDashboard(d.data)
+      setTimeline(Array.isArray(t.data) ? t.data.filter((item) => item.tipo_registro !== 'fipe') : [])
+    } finally {
+      setLoading(false)
+    }
   }
+
+  useEffect(() => {
+    setLoading(true)
+  }, [vehicleId])
 
   useEffect(() => {
     if (!vehicleId) return
@@ -386,7 +396,7 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
   }
 
   if (!vehicleId) return <div className="alert alert-info">Cadastre um veículo em "Meu veículo".</div>
-  if (!dashboard) return <div>Carregando...</div>
+  if (loading && !dashboard) return <Spinner label="Carregando dados do veículo..." />
 
   return (
     <>
@@ -479,9 +489,10 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
 
       <div className="card"><div className="card-body" ref={printAreaRef}><h6 className="timeline-title"><i className="fa-solid fa-list me-2" />Linha do tempo</h6>
         <small className="text-muted d-block mt-1">Exibindo {timelineExibida.length} de {timelineFiltrada.length} registro(s) no filtro atual.</small>
+        {loading ? <TimelineSkeleton /> : (
         <div className="d-flex flex-column gap-3 mt-3">
-          {paginatedTimeline.map((item) => (
-            <div className="timeline-item" key={`${item.tipo_registro}-${item.id}`}>
+          {paginatedTimeline.map((item, idx) => (
+            <div className="timeline-item" key={`${item.tipo_registro}-${item.id}`} style={{ animationDelay: `${Math.min(idx, 8) * 45}ms` }}>
               <div className="timeline-top-row">
                 <div className="timeline-main">
                   <strong><i className={`${getRecordIcon(item.tipo_registro)} me-2`} />{formatTipoRegistro(item.tipo_registro)}</strong>
@@ -504,13 +515,14 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
               <small>{buildTimelineDescription(item)}</small>
               {!!buildHoverDetails(item).length && (
                 <div className="timeline-hover-card">
-                  {buildHoverDetails(item).map((detail, idx) => <div key={`${item.id}-${idx}`}>{detail}</div>)}
+                  {buildHoverDetails(item).map((detail, di) => <div key={`${item.id}-${di}`}>{detail}</div>)}
                 </div>
               )}
             </div>
           ))}
           {!timelineExibida.length && <p className="text-muted mb-0">Nenhum registro encontrado para o filtro selecionado.</p>}
         </div>
+        )}
         {!!timelineExibida.length && <div className="d-flex align-items-center justify-content-between mt-3">
           <small className="text-muted">Página {page} de {totalPages}</small>
           <div className="d-flex gap-2">

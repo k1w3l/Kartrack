@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, NavLink, useNavigate } from 'react-router-dom'
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import api from '../api'
 import { useUI } from './UIProvider'
 
@@ -16,6 +16,7 @@ const items = [
 
 export default function Layout({ user, apiOrigin, children, onToggleTheme, darkMode, onLogout, menuOpen, onToggleMenu, onCloseMenu }) {
   const navigate = useNavigate()
+  const location = useLocation()
   const { toast, prompt } = useUI()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [isMobileBrowser, setIsMobileBrowser] = useState(false)
@@ -130,7 +131,9 @@ export default function Layout({ user, apiOrigin, children, onToggleTheme, darkM
               ))}
             </nav>
           </aside>
-          <main className="col-12 col-md-9 col-lg-10 p-3 p-md-4">{children}</main>
+          <main className="col-12 col-md-9 col-lg-10 p-3 p-md-4">
+            <div className="page-transition" key={location.pathname}>{children}</div>
+          </main>
         </div>
       </div>
     </div>
