@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import api from '../api'
+import { useUI } from '../components/UIProvider'
 
 const defaultNewUser = { name: '', email: '', password: '' }
 
 export default function SettingsPage({ user, onUserUpdated }) {
+  const { confirm, prompt, toast } = useUI()
   const [users, setUsers] = useState([])
   const [newUser, setNewUser] = useState(defaultNewUser)
   const [preferences, setPreferences] = useState({
@@ -30,27 +32,37 @@ export default function SettingsPage({ user, onUserUpdated }) {
   const savePreferences = async () => {
     await api.put('/me/preferences', preferences)
     await onUserUpdated?.()
-    alert('Preferências atualizadas com sucesso.')
+    toast.success('Preferências atualizadas com sucesso.')
   }
 
   const createUser = async () => {
-    if (!newUser.name || !newUser.email || !newUser.password) return
-    await api.post('/users', newUser)
-    setNewUser(defaultNewUser)
-    await loadUsers()
+    if (!newUser.name || !newUser.email || !newUser.password) {
+      toast.warning('Preencha nome, e-mail e senha para criar o usuário.')
+      return
+    }
+    try {
+      await api.post('/users', newUser)
+      setNewUser(defaultNewUser)
+      await loadUsers()
+      toast.success('Usuário criado com sucesso.')
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Não foi possível criar o usuário.')
+    }
   }
 
   const deleteUser = async (userId) => {
-    if (!window.confirm('Deseja excluir este usuário?')) return
+    const ok = await confirm({ title: 'Excluir usuário', message: 'Deseja excluir este usuário?', confirmLabel: 'Excluir', danger: true })
+    if (!ok) return
     await api.delete(`/users/${userId}`)
     await loadUsers()
+    toast.success('Usuário excluído.')
   }
 
   const resetPassword = async (userId) => {
-    const next = window.prompt('Digite a nova senha (mínimo 6 caracteres):')
+    const next = await prompt({ title: 'Redefinir senha', label: 'Nova senha', inputType: 'password', minLength: 6, titleIcon: 'fa-solid fa-key', confirmLabel: 'Redefinir' })
     if (!next) return
     await api.post(`/users/${userId}/reset-password`, { new_password: next })
-    alert('Senha redefinida com sucesso.')
+    toast.success('Senha redefinida com sucesso.')
   }
 
   return (
@@ -63,11 +75,20 @@ export default function SettingsPage({ user, onUserUpdated }) {
         <div className="card card-body">
           <h5><i className="fa-solid fa-users-gear me-2" />Gestão de usuários</h5>
 
-          <div className="row g-2 mt-1">
-            <div className="col-md-4"><input className="form-control" placeholder="Nome" value={newUser.name} onChange={(e) => setNewUser((p) => ({ ...p, name: e.target.value }))} /></div>
-            <div className="col-md-4"><input className="form-control" placeholder="E-mail" value={newUser.email} onChange={(e) => setNewUser((p) => ({ ...p, email: e.target.value }))} /></div>
-            <div className="col-md-3"><input className="form-control" placeholder="Senha" type="password" value={newUser.password} onChange={(e) => setNewUser((p) => ({ ...p, password: e.target.value }))} /></div>
-            <div className="col-md-1"><button type="button" className="btn btn-primary w-100" onClick={createUser}><i className="fa-solid fa-plus" /></button></div>
+          <div className="row g-2 mt-1 align-items-end">
+            <div className="col-md-4">
+              <label className="form-label" htmlFor="new-user-name">Nome</label>
+              <input id="new-user-name" className="form-control" placeholder="Nome" autoComplete="off" value={newUser.name} onChange={(e) => setNewUser((p) => ({ ...p, name: e.target.value }))} />
+            </div>
+            <div className="col-md-4">
+              <label className="form-label" htmlFor="new-user-email">E-mail</label>
+              <input id="new-user-email" className="form-control" placeholder="E-mail" type="email" inputMode="email" autoComplete="off" value={newUser.email} onChange={(e) => setNewUser((p) => ({ ...p, email: e.target.value }))} />
+            </div>
+            <div className="col-md-3">
+              <label className="form-label" htmlFor="new-user-password">Senha</label>
+              <input id="new-user-password" className="form-control" placeholder="Senha" type="password" autoComplete="new-password" value={newUser.password} onChange={(e) => setNewUser((p) => ({ ...p, password: e.target.value }))} />
+            </div>
+            <div className="col-md-1"><button type="button" className="btn btn-primary w-100" onClick={createUser} aria-label="Adicionar usuário"><i className="fa-solid fa-plus" /></button></div>
           </div>
 
           <div className="table-responsive mt-3">

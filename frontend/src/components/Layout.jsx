@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
 import api from '../api'
+import { useUI } from './UIProvider'
 
 const items = [
   { label: 'Início', url: '/', icon: 'fa-solid fa-house' },
@@ -15,8 +16,10 @@ const items = [
 
 export default function Layout({ user, apiOrigin, children, onToggleTheme, darkMode, onLogout, menuOpen, onToggleMenu, onCloseMenu }) {
   const navigate = useNavigate()
+  const { toast, prompt } = useUI()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [isMobileBrowser, setIsMobileBrowser] = useState(false)
+  const userMenuRef = useRef(null)
 
   useEffect(() => {
     const uaMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
@@ -24,18 +27,34 @@ export default function Layout({ user, apiOrigin, children, onToggleTheme, darkM
     setIsMobileBrowser(uaMobile || mediaMobile)
   }, [])
 
+  useEffect(() => {
+    if (!userMenuOpen) return undefined
+    const handlePointer = (event) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) setUserMenuOpen(false)
+    }
+    const handleKey = (event) => {
+      if (event.key === 'Escape') setUserMenuOpen(false)
+    }
+    document.addEventListener('mousedown', handlePointer)
+    document.addEventListener('keydown', handleKey)
+    return () => {
+      document.removeEventListener('mousedown', handlePointer)
+      document.removeEventListener('keydown', handleKey)
+    }
+  }, [userMenuOpen])
+
   const handleChangePassword = async () => {
-    const current = window.prompt('Digite sua senha atual:')
+    setUserMenuOpen(false)
+    const current = await prompt({ title: 'Trocar senha', label: 'Senha atual', inputType: 'password', titleIcon: 'fa-solid fa-key', confirmLabel: 'Continuar' })
     if (!current) return
-    const next = window.prompt('Digite a nova senha (mínimo de 6 caracteres):')
+    const next = await prompt({ title: 'Trocar senha', label: 'Nova senha', inputType: 'password', minLength: 6, titleIcon: 'fa-solid fa-key', confirmLabel: 'Alterar senha' })
     if (!next) return
 
     try {
       await api.post('/auth/change-password', { current_password: current, new_password: next })
-      window.alert('Senha alterada com sucesso!')
-      setUserMenuOpen(false)
+      toast.success('Senha alterada com sucesso!')
     } catch (err) {
-      window.alert(err?.response?.data?.detail || 'Não foi possível alterar a senha.')
+      toast.error(err?.response?.data?.detail || 'Não foi possível alterar a senha.')
     }
   }
 
@@ -56,12 +75,12 @@ export default function Layout({ user, apiOrigin, children, onToggleTheme, darkM
           </Link>
         </div>
 
-        <div className="d-flex gap-2 align-items-center position-relative">
-          <button className="btn btn-outline-secondary btn-sm icon-btn" onClick={onToggleTheme} title={darkMode ? 'Ativar tema claro' : 'Ativar tema escuro'}>
+        <div className="d-flex gap-2 align-items-center position-relative" ref={userMenuRef}>
+          <button className="btn btn-outline-secondary btn-sm icon-btn" onClick={onToggleTheme} aria-pressed={darkMode} title={darkMode ? 'Ativar tema claro' : 'Ativar tema escuro'}>
             <i className={`fa-solid ${darkMode ? 'fa-toggle-on' : 'fa-toggle-off'}`} />
           </button>
 
-          <button className="btn btn-outline-secondary btn-sm icon-btn" onClick={() => setUserMenuOpen((v) => !v)} title={user?.name || 'Usuário'}>
+          <button className="btn btn-outline-secondary btn-sm icon-btn" onClick={() => setUserMenuOpen((v) => !v)} aria-haspopup="menu" aria-expanded={userMenuOpen} title={user?.name || 'Usuário'}>
             <i className="fa-solid fa-circle-user" />
           </button>
 
@@ -92,10 +111,22 @@ export default function Layout({ user, apiOrigin, children, onToggleTheme, darkM
           <aside className={`col-md-3 col-lg-2 p-3 app-sidebar ${menuOpen ? 'show-mobile' : ''}`}>
             <nav className="nav flex-column gap-2">
               {items.map((item) => (
-                <Link key={item.url} className="btn nav-btn text-start" to={item.url} onClick={onCloseMenu} title={item.label}>
-                  <i className={`${item.icon} me-2`} />
-                  <span className="nav-label">{item.label}</span>
-                </Link>
+                <NavLink
+                  key={item.url}
+                  end={item.url === '/'}
+                  className={({ isActive }) => `btn nav-btn text-start${isActive ? ' active' : ''}`}
+                  to={item.url}
+                  onClick={onCloseMenu}
+                  title={item.label}
+                >
+                  {({ isActive }) => (
+                    <>
+                      <i className={`${item.icon} me-2`} />
+                      <span className="nav-label">{item.label}</span>
+                      {isActive && <span className="visually-hidden"> (página atual)</span>}
+                    </>
+                  )}
+                </NavLink>
               ))}
             </nav>
           </aside>
