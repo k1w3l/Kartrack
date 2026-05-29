@@ -1,4 +1,5 @@
 from collections import defaultdict
+from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta
 from io import StringIO
 import csv
@@ -8,10 +9,12 @@ from pathlib import Path
 from urllib.parse import urlencode
 from urllib.request import urlopen
 
-from fastapi import Body, Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi import Body, Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import StreamingResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -42,13 +45,43 @@ from .schemas import (
     UserPreferencesIn,
 )
 
-app = FastAPI(title=settings.app_name)
+def _rate_limit_key(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "anonymous"
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if settings.secret_key_is_default:
+        raise RuntimeError(
+            "SECRET_KEY não configurada: defina uma chave forte e única em backend/.env "
+            "antes de iniciar a aplicação."
+        )
+    _ensure_upload_dirs()
+    init_db()
+    yield
+
+
+limiter = Limiter(key_func=_rate_limit_key)
+app = FastAPI(title=settings.app_name, lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 UPLOAD_ROOT = Path("uploads")
 VEHICLE_UPLOAD_DIR = UPLOAD_ROOT / "vehicles"
 FIPE_API_BASE = "https://fipe.parallelum.com.br/api/v2"
+ALLOWED_VEHICLE_TYPES = {"cars", "motorcycles", "trucks"}
+ALLOWED_PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
 VEHICLE_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _validate_vehicle_type(vehicle_type: str) -> str:
+    if vehicle_type not in ALLOWED_VEHICLE_TYPES:
+        raise HTTPException(status_code=400, detail="Tipo de veículo inválido")
+    return vehicle_type
 
 
 def _ensure_upload_dirs() -> None:
@@ -92,6 +125,8 @@ def _second_business_day(year: int, month: int) -> date:
 
 def _refresh_vehicle_fipe_if_needed(vehicle: Vehicle, db: Session, force: bool = False) -> None:
     if not vehicle.fipe_brand_id or not vehicle.fipe_model_id or not vehicle.fipe_year_code:
+        return
+    if vehicle.tipo_veiculo not in ALLOWED_VEHICLE_TYPES:
         return
 
     today = date.today()
@@ -194,17 +229,11 @@ def _serialize_vehicle(vehicle: Vehicle) -> dict:
     }
 
 
-@app.on_event("startup")
-def on_startup() -> None:
-    _ensure_upload_dirs()
-    init_db()
-
-
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_ROOT)), name="uploads")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origin_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -250,7 +279,8 @@ def _ensure_lookup_defaults(db: Session, user_id: int, category: str) -> None:
 
 
 @app.post(f"{settings.api_prefix}/auth/register", response_model=UserOut)
-def register(user_in: UserCreate, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def register(request: Request, user_in: UserCreate, db: Session = Depends(get_db)):
     existing = db.query(User).filter(User.email == user_in.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="E-mail já cadastrado")
@@ -268,7 +298,8 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
 
 
 @app.post(f"{settings.api_prefix}/auth/login", response_model=TokenOut)
-def login(payload: LoginInput, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def login(request: Request, payload: LoginInput, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == payload.email).first()
     if not user or not verify_password(payload.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Usuário ou senha inválidos")
@@ -444,10 +475,11 @@ def create_vehicle(vehicle_in: VehicleIn, db: Session = Depends(get_db), current
 @app.get(f"{settings.api_prefix}/vehicles", response_model=list[VehicleOut])
 def list_vehicles(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     vehicles = db.query(Vehicle).filter(Vehicle.user_id == current_user.id).all()
+    # A quilometragem é mantida nas rotas de escrita; aqui só verificamos a FIPE
+    # (a checagem é barata e só faz chamada de rede na janela mensal de atualização).
+    # /vehicles é chamado no login e após alterações de veículo, não no polling do dashboard.
     for vehicle in vehicles:
-        _sync_vehicle_odometer(vehicle, db)
         _refresh_vehicle_fipe_if_needed(vehicle, db)
-    vehicles = db.query(Vehicle).filter(Vehicle.user_id == current_user.id).all()
     return [_serialize_vehicle(v) for v in vehicles]
 
 
@@ -483,8 +515,17 @@ def upload_vehicle_photo(
 ):
     vehicle = _ensure_vehicle(vehicle_id, current_user, db)
     ext = Path(file.filename or "").suffix.lower() or ".jpg"
-    if ext not in {".jpg", ".jpeg", ".png", ".webp", ".gif"}:
+    if ext not in ALLOWED_PHOTO_EXTS:
         raise HTTPException(status_code=400, detail="Formato de imagem não suportado")
+
+    content = file.file.read(settings.max_upload_bytes + 1)
+    if len(content) > settings.max_upload_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Imagem muito grande (máximo {settings.max_upload_bytes // (1024 * 1024)} MB)",
+        )
+    if not content.startswith((b"\xff\xd8\xff", b"\x89PNG\r\n\x1a\n", b"GIF87a", b"GIF89a", b"RIFF")):
+        raise HTTPException(status_code=400, detail="Arquivo enviado não é uma imagem válida")
 
     for old in VEHICLE_UPLOAD_DIR.glob(f"vehicle_{vehicle_id}.*"):
         old.unlink(missing_ok=True)
@@ -492,7 +533,7 @@ def upload_vehicle_photo(
     filename = f"vehicle_{vehicle_id}{ext}"
     target = VEHICLE_UPLOAD_DIR / filename
     with target.open("wb") as f:
-        f.write(file.file.read())
+        f.write(content)
 
     return _serialize_vehicle(vehicle)
 
@@ -512,13 +553,15 @@ def delete_vehicle(
 
 
 @app.get(f"{settings.api_prefix}/fipe/brands", response_model=list[FipeOption])
-def fipe_brands(vehicle_type: str = "cars"):
+def fipe_brands(vehicle_type: str = "cars", current_user: User = Depends(get_current_user)):
+    vehicle_type = _validate_vehicle_type(vehicle_type)
     data = _fipe_get(f"{vehicle_type}/brands")
     return [FipeOption(codigo=str(item.get("code")), nome=item.get("name") or "") for item in data]
 
 
 @app.get(f"{settings.api_prefix}/fipe/models", response_model=list[FipeOption])
-def fipe_models(vehicle_type: str = "cars", brand_id: int = 0):
+def fipe_models(vehicle_type: str = "cars", brand_id: int = 0, current_user: User = Depends(get_current_user)):
+    vehicle_type = _validate_vehicle_type(vehicle_type)
     if not brand_id:
         return []
     data = _fipe_get(f"{vehicle_type}/brands/{brand_id}/models")
@@ -526,7 +569,8 @@ def fipe_models(vehicle_type: str = "cars", brand_id: int = 0):
 
 
 @app.get(f"{settings.api_prefix}/fipe/years", response_model=list[FipeOption])
-def fipe_years(vehicle_type: str = "cars", brand_id: int = 0, model_id: int = 0):
+def fipe_years(vehicle_type: str = "cars", brand_id: int = 0, model_id: int = 0, current_user: User = Depends(get_current_user)):
+    vehicle_type = _validate_vehicle_type(vehicle_type)
     if not brand_id or not model_id:
         return []
     data = _fipe_get(f"{vehicle_type}/brands/{brand_id}/models/{model_id}/years")
@@ -534,7 +578,8 @@ def fipe_years(vehicle_type: str = "cars", brand_id: int = 0, model_id: int = 0)
 
 
 @app.get(f"{settings.api_prefix}/fipe/price")
-def fipe_price(vehicle_type: str = "cars", brand_id: int = 0, model_id: int = 0, year_code: str = ""):
+def fipe_price(vehicle_type: str = "cars", brand_id: int = 0, model_id: int = 0, year_code: str = "", current_user: User = Depends(get_current_user)):
+    vehicle_type = _validate_vehicle_type(vehicle_type)
     if not brand_id or not model_id or not year_code:
         raise HTTPException(status_code=400, detail="Parâmetros FIPE incompletos")
     details = _fipe_get(f"{vehicle_type}/brands/{brand_id}/models/{model_id}/years/{year_code}")
@@ -659,9 +704,9 @@ def add_fuel(record: FuelIn, db: Session = Depends(get_db), current_user: User =
         valor_total=record.valor_total,
         valor_litro=(record.valor_total / record.litros if record.litros else 0),
     )
-    vehicle.quilometragem_atual = max(vehicle.quilometragem_atual, record.quilometragem)
     db.add(fuel)
     db.commit()
+    _sync_vehicle_odometer(vehicle, db)
     return {"ok": True}
 
 
@@ -677,7 +722,7 @@ def update_fuel(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _ensure_vehicle(record.vehicle_id, current_user, db)
+    vehicle = _ensure_vehicle(record.vehicle_id, current_user, db)
     fuel = _ensure_fuel_record(fuel_id, current_user, db)
 
     for key, value in record.model_dump().items():
@@ -687,14 +732,19 @@ def update_fuel(
     db.add(fuel)
     db.commit()
     db.refresh(fuel)
+    _sync_vehicle_odometer(vehicle, db)
     return fuel
 
 
 @app.delete(f"{settings.api_prefix}/fuel/{'{'}fuel_id{'}'}")
 def delete_fuel(fuel_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     fuel = _ensure_fuel_record(fuel_id, current_user, db)
+    vehicle_id = fuel.vehicle_id
     db.delete(fuel)
     db.commit()
+    vehicle = db.query(Vehicle).filter(Vehicle.id == vehicle_id).first()
+    if vehicle:
+        _sync_vehicle_odometer(vehicle, db)
     return {"ok": True}
 
 
@@ -702,10 +752,9 @@ def delete_fuel(fuel_id: int, db: Session = Depends(get_db), current_user: User 
 def add_expense(record: ExpenseIn, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     vehicle = _ensure_vehicle(record.vehicle_id, current_user, db)
     expense = ExpenseRecord(**record.model_dump())
-    if record.quilometragem:
-        vehicle.quilometragem_atual = max(vehicle.quilometragem_atual, record.quilometragem)
     db.add(expense)
     db.commit()
+    _sync_vehicle_odometer(vehicle, db)
     return {"ok": True}
 
 
@@ -721,7 +770,7 @@ def update_expense(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _ensure_vehicle(record.vehicle_id, current_user, db)
+    vehicle = _ensure_vehicle(record.vehicle_id, current_user, db)
     expense = _ensure_expense_record(expense_id, current_user, db)
 
     for key, value in record.model_dump().items():
@@ -730,14 +779,19 @@ def update_expense(
     db.add(expense)
     db.commit()
     db.refresh(expense)
+    _sync_vehicle_odometer(vehicle, db)
     return expense
 
 
 @app.delete(f"{settings.api_prefix}/expenses/{'{'}expense_id{'}'}")
 def delete_expense(expense_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     expense = _ensure_expense_record(expense_id, current_user, db)
+    vehicle_id = expense.vehicle_id
     db.delete(expense)
     db.commit()
+    vehicle = db.query(Vehicle).filter(Vehicle.id == vehicle_id).first()
+    if vehicle:
+        _sync_vehicle_odometer(vehicle, db)
     return {"ok": True}
 
 
@@ -757,8 +811,6 @@ def confirm_reminder(
 @app.get(f"{settings.api_prefix}/timeline", response_model=list[TimelineItem])
 def timeline(vehicle_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     vehicle = _ensure_vehicle(vehicle_id, current_user, db)
-    _sync_vehicle_odometer(vehicle, db)
-    _refresh_vehicle_fipe_if_needed(vehicle, db)
     fuels = db.query(FuelRecord).filter(FuelRecord.vehicle_id == vehicle_id).all()
     expenses = db.query(ExpenseRecord).filter(ExpenseRecord.vehicle_id == vehicle_id).all()
     fipe_history = db.query(VehicleFipeHistory).filter(VehicleFipeHistory.vehicle_id == vehicle_id).all()
@@ -813,9 +865,6 @@ def timeline(vehicle_id: int, db: Session = Depends(get_db), current_user: User 
 @app.get(f"{settings.api_prefix}/dashboard", response_model=DashboardOut)
 def dashboard(vehicle_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     vehicle = _ensure_vehicle(vehicle_id, current_user, db)
-    _sync_vehicle_odometer(vehicle, db)
-    _refresh_vehicle_fipe_if_needed(vehicle, db)
-    db.refresh(vehicle)
     total_fuel = db.query(func.coalesce(func.sum(FuelRecord.valor_total), 0)).filter(FuelRecord.vehicle_id == vehicle_id).scalar()
     total_exp = db.query(func.coalesce(func.sum(ExpenseRecord.valor), 0)).filter(ExpenseRecord.vehicle_id == vehicle_id).scalar()
 
@@ -868,8 +917,7 @@ def dashboard(vehicle_id: int, db: Session = Depends(get_db), current_user: User
 
 @app.get(f"{settings.api_prefix}/reports", response_model=ReportOut)
 def reports(vehicle_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    vehicle = _ensure_vehicle(vehicle_id, current_user, db)
-    _refresh_vehicle_fipe_if_needed(vehicle, db)
+    _ensure_vehicle(vehicle_id, current_user, db)
     expenses = db.query(ExpenseRecord).filter(ExpenseRecord.vehicle_id == vehicle_id).all()
     fuels = db.query(FuelRecord).filter(FuelRecord.vehicle_id == vehicle_id).all()
 
@@ -890,8 +938,7 @@ def reports(vehicle_id: int, db: Session = Depends(get_db), current_user: User =
 
 @app.get(f"{settings.api_prefix}/fipe/history", response_model=list[FipeHistoryPoint])
 def fipe_history(vehicle_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    vehicle = _ensure_vehicle(vehicle_id, current_user, db)
-    _refresh_vehicle_fipe_if_needed(vehicle, db)
+    _ensure_vehicle(vehicle_id, current_user, db)
     points = (
         db.query(VehicleFipeHistory)
         .filter(VehicleFipeHistory.vehicle_id == vehicle_id)
@@ -932,11 +979,13 @@ def import_csv(
         )
     reader = csv.DictReader(StringIO(content))
     imported = {"abastecimentos": 0, "despesas": 0}
+    erros: list[str] = []
 
     only_fuel = mode == "abastecimentos"
     only_expenses = mode == "despesas"
 
-    for row in reader:
+    # A linha 1 é o cabeçalho; os dados começam na linha 2.
+    for line_no, row in enumerate(reader, start=2):
         categoria = (row.get("categoria") or "").strip().lower()
         is_fuel = categoria == "abastecimento"
 
@@ -945,52 +994,59 @@ def import_csv(
         if only_expenses and is_fuel:
             continue
 
-        if is_fuel:
-            litros = float(row.get("litros") or 0)
-            valor_total = float(row.get("valor") or 0)
-            bandeira = (row.get("bandeira") or "").strip()
-            local = (row.get("local") or "").strip()
-            posto = f"{bandeira} - {local}" if bandeira and local else (local or row.get("posto") or "Não informado")
-            db.add(
-                FuelRecord(
-                    vehicle_id=vehicle_id,
-                    data=datetime.strptime(row.get("data"), "%Y-%m-%d").date(),
-                    quilometragem=float(row.get("quilometragem") or 0),
-                    tipo_combustivel=row.get("tipo_combustivel") or "Gasolina Comum",
-                    litros=litros,
-                    valor_total=valor_total,
-                    valor_litro=(valor_total / litros if litros else 0),
-                    tanque_cheio=str(row.get("tanque_cheio") or "").strip().lower() in {"1", "true", "sim", "yes", "y"},
-                    posto=posto,
-                    descricao=row.get("descricao") or "",
-                )
-            )
-            imported["abastecimentos"] += 1
-        else:
-            descricao_parts = []
-            for key in ("pecas", "descricao_servico", "valor_pecas", "valor_servico", "parcelas", "valor_parcela", "classe_bonus"):
-                val = row.get(key)
-                if val not in (None, ""):
-                    descricao_parts.append(f"{key}: {val}")
+        try:
+            data_valor = datetime.strptime((row.get("data") or "").strip(), "%Y-%m-%d").date()
 
-            descricao_extra = " • ".join(descricao_parts)
-            descricao_base = row.get("descricao") or ""
-            descricao_final = f"{descricao_base} • {descricao_extra}".strip(" •") if descricao_extra else descricao_base
-            db.add(
-                ExpenseRecord(
-                    vehicle_id=vehicle_id,
-                    tipo=categoria or "outros",
-                    data=datetime.strptime(row.get("data"), "%Y-%m-%d").date(),
-                    quilometragem=float(row.get("quilometragem") or 0) or None,
-                    local=row.get("local") or "",
-                    descricao=descricao_final,
-                    valor=float(row.get("valor") or 0),
-                    status=row.get("status") or "registrado",
+            if is_fuel:
+                litros = float(row.get("litros") or 0)
+                valor_total = float(row.get("valor") or 0)
+                bandeira = (row.get("bandeira") or "").strip()
+                local = (row.get("local") or "").strip()
+                posto = f"{bandeira} - {local}" if bandeira and local else (local or row.get("posto") or "Não informado")
+                db.add(
+                    FuelRecord(
+                        vehicle_id=vehicle_id,
+                        data=data_valor,
+                        quilometragem=float(row.get("quilometragem") or 0),
+                        tipo_combustivel=row.get("tipo_combustivel") or "Gasolina Comum",
+                        litros=litros,
+                        valor_total=valor_total,
+                        valor_litro=(valor_total / litros if litros else 0),
+                        tanque_cheio=str(row.get("tanque_cheio") or "").strip().lower() in {"1", "true", "sim", "yes", "y"},
+                        posto=posto,
+                        descricao=row.get("descricao") or "",
+                    )
                 )
-            )
-            imported["despesas"] += 1
+                imported["abastecimentos"] += 1
+            else:
+                descricao_parts = []
+                for key in ("pecas", "descricao_servico", "valor_pecas", "valor_servico", "parcelas", "valor_parcela", "classe_bonus"):
+                    val = row.get(key)
+                    if val not in (None, ""):
+                        descricao_parts.append(f"{key}: {val}")
+
+                descricao_extra = " • ".join(descricao_parts)
+                descricao_base = row.get("descricao") or ""
+                descricao_final = f"{descricao_base} • {descricao_extra}".strip(" •") if descricao_extra else descricao_base
+                db.add(
+                    ExpenseRecord(
+                        vehicle_id=vehicle_id,
+                        tipo=categoria or "outros",
+                        data=data_valor,
+                        quilometragem=float(row.get("quilometragem") or 0) or None,
+                        local=row.get("local") or "",
+                        descricao=descricao_final,
+                        valor=float(row.get("valor") or 0),
+                        status=row.get("status") or "registrado",
+                    )
+                )
+                imported["despesas"] += 1
+        except (ValueError, TypeError) as exc:
+            if len(erros) < 50:
+                erros.append(f"Linha {line_no}: dados inválidos ({exc})")
+
     db.commit()
-    return imported
+    return {**imported, "erros": erros}
 
 
 @app.get(f"{settings.api_prefix}/records/export")
@@ -1120,10 +1176,23 @@ def system_restore(payload: dict = Body(...), db: Session = Depends(get_db), cur
     fuels_payload = payload.get("fuels") or []
     expenses_payload = payload.get("expenses") or []
 
+    try:
+        return _apply_restore(db, current_user, vehicles_payload, fuels_payload, expenses_payload)
+    except HTTPException:
+        raise
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="Backup inválido ou corrompido. Nenhum dado foi alterado.",
+        )
+
+
+def _apply_restore(db, current_user, vehicles_payload, fuels_payload, expenses_payload):
     existing = db.query(Vehicle).filter(Vehicle.user_id == current_user.id).all()
     for v in existing:
         db.delete(v)
-    db.commit()
+    db.flush()
 
     id_map = {}
     for v in vehicles_payload:
