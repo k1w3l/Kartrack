@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api'
+import Modal from '../components/Modal'
+import { Spinner, TimelineSkeleton } from '../components/Loading'
+import { useUI } from '../components/UIProvider'
 
 const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 
@@ -176,8 +179,10 @@ function buildFieldRows(record, timelineItem) {
 
 export default function DashboardPage({ vehicleId, currentVehicle }) {
   const navigate = useNavigate()
+  const { confirm } = useUI()
   const [dashboard, setDashboard] = useState(null)
   const [timeline, setTimeline] = useState([])
+  const [loading, setLoading] = useState(true)
 
   const now = new Date()
   const [month, setMonth] = useState(String(now.getMonth() + 1).padStart(2, '0'))
@@ -196,19 +201,34 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
 
   const load = async () => {
     if (!vehicleId) return
-    const [d, t] = await Promise.all([
-      api.get('/dashboard', { params: { vehicle_id: vehicleId } }),
-      api.get('/timeline', { params: { vehicle_id: vehicleId } }),
-    ])
-    setDashboard(d.data)
-    setTimeline(Array.isArray(t.data) ? t.data.filter((item) => item.tipo_registro !== 'fipe') : [])
+    try {
+      const [d, t] = await Promise.all([
+        api.get('/dashboard', { params: { vehicle_id: vehicleId } }),
+        api.get('/timeline', { params: { vehicle_id: vehicleId } }),
+      ])
+      setDashboard(d.data)
+      setTimeline(Array.isArray(t.data) ? t.data.filter((item) => item.tipo_registro !== 'fipe') : [])
+    } finally {
+      setLoading(false)
+    }
   }
+
+  useEffect(() => {
+    setLoading(true)
+  }, [vehicleId])
 
   useEffect(() => {
     if (!vehicleId) return
     load()
-    const it = setInterval(load, 10000)
-    return () => clearInterval(it)
+    const it = setInterval(() => {
+      if (!document.hidden) load()
+    }, 10000)
+    const onVisible = () => { if (!document.hidden) load() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(it)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [vehicleId])
 
   useEffect(() => {
@@ -348,7 +368,8 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
 
   const deleteRecord = async (item) => {
     if (item.tipo_registro === 'fipe') return
-    if (!window.confirm('Deseja realmente excluir este registro?')) return
+    const ok = await confirm({ title: 'Excluir registro', message: 'Deseja realmente excluir este registro?', confirmLabel: 'Excluir', danger: true })
+    if (!ok) return
     if (item.tipo_registro === 'abastecimento') await api.delete(`/fuel/${item.id}`)
     else await api.delete(`/expenses/${item.id}`)
     await load()
@@ -359,14 +380,23 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
     if (!content) return
     const w = window.open('', '_blank')
     if (!w) return
-    w.document.write(`<html><head><title>Timeline Kartrack</title></head><body>${content}</body></html>`)
+    w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8" /><title>Timeline Kartrack</title><style>
+      body { font-family: Inter, system-ui, sans-serif; color: #0f172a; margin: 24px; }
+      h6, .timeline-title { font-size: 16px; margin: 0 0 12px; font-weight: 700; }
+      .timeline-item { border: 1px solid #dbe2ee; border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+      .timeline-top-row { display: flex; justify-content: space-between; gap: 8px; }
+      .timeline-separator { color: #94a3b8; margin: 0 6px; }
+      .timeline-consumo { color: #2563eb; font-weight: 600; }
+      .timeline-actions, .timeline-hover-card, button, .btn { display: none !important; }
+      small { color: #64748b; }
+    </style></head><body>${content}</body></html>`)
     w.document.close()
     w.focus()
-    w.print()
+    setTimeout(() => w.print(), 250)
   }
 
   if (!vehicleId) return <div className="alert alert-info">Cadastre um veículo em "Meu veículo".</div>
-  if (!dashboard) return <div>Carregando...</div>
+  if (loading && !dashboard) return <Spinner label="Carregando dados do veículo..." />
 
   return (
     <>
@@ -448,7 +478,7 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
         const kms = Number((String(l).match(/faltam\s+(-?\d+)\s+km/i) || [])[1])
         const isDanger = Number.isFinite(days) ? days <= 30 : Number.isFinite(kms) ? kms <= 1000 : false
         const isWarning = !isDanger && (Number.isFinite(days) ? days <= 60 : Number.isFinite(kms) ? kms <= 2000 : false)
-        return <li key={raw} className={`${isDanger ? 'text-danger fw-semibold' : isWarning ? 'text-warning fw-semibold' : ''} d-flex align-items-center gap-2 py-1`}>
+        return <li key={raw} className={`${isDanger ? 'text-danger fw-semibold' : isWarning ? 'reminder-warning' : ''} d-flex align-items-center gap-2 py-1`}>
           <input type="checkbox" className="form-check-input mt-0" checked={selectedReminderIds.includes(id)} title="Marcar lembrete para exclusão" onChange={(e) => setSelectedReminderIds((prev) => e.target.checked ? [...new Set([...prev, id])] : prev.filter((x) => x !== id))} />
           {isDanger ? <i className="fa-solid fa-triangle-exclamation me-1" /> : null}
           <span>{l}</span>
@@ -459,9 +489,10 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
 
       <div className="card"><div className="card-body" ref={printAreaRef}><h6 className="timeline-title"><i className="fa-solid fa-list me-2" />Linha do tempo</h6>
         <small className="text-muted d-block mt-1">Exibindo {timelineExibida.length} de {timelineFiltrada.length} registro(s) no filtro atual.</small>
+        {loading ? <TimelineSkeleton /> : (
         <div className="d-flex flex-column gap-3 mt-3">
-          {paginatedTimeline.map((item) => (
-            <div className="timeline-item" key={`${item.tipo_registro}-${item.id}`}>
+          {paginatedTimeline.map((item, idx) => (
+            <div className="timeline-item" key={`${item.tipo_registro}-${item.id}`} style={{ animationDelay: `${Math.min(idx, 8) * 45}ms` }}>
               <div className="timeline-top-row">
                 <div className="timeline-main">
                   <strong><i className={`${getRecordIcon(item.tipo_registro)} me-2`} />{formatTipoRegistro(item.tipo_registro)}</strong>
@@ -484,13 +515,14 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
               <small>{buildTimelineDescription(item)}</small>
               {!!buildHoverDetails(item).length && (
                 <div className="timeline-hover-card">
-                  {buildHoverDetails(item).map((detail, idx) => <div key={`${item.id}-${idx}`}>{detail}</div>)}
+                  {buildHoverDetails(item).map((detail, di) => <div key={`${item.id}-${di}`}>{detail}</div>)}
                 </div>
               )}
             </div>
           ))}
           {!timelineExibida.length && <p className="text-muted mb-0">Nenhum registro encontrado para o filtro selecionado.</p>}
         </div>
+        )}
         {!!timelineExibida.length && <div className="d-flex align-items-center justify-content-between mt-3">
           <small className="text-muted">Página {page} de {totalPages}</small>
           <div className="d-flex gap-2">
@@ -499,33 +531,33 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
           </div>
         </div>}
       </div></div>
-      {detailModal && (
-        <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ background: 'rgba(0,0,0,.45)', zIndex: 9999 }}>
-          <div className="card timeline-modal-card">
-            <div className="card-body">
-              <div className="d-flex justify-content-between align-items-start gap-3">
-                <div>
-                  <h5 className="mb-1"><i className={`${getRecordIcon(detailModal.item.tipo_registro)} me-2`} />{formatTipoRegistro(detailModal.item.tipo_registro)}</h5>
-                  <small className="text-muted">ID #{detailModal.item.id}</small>
+      <Modal
+        open={Boolean(detailModal)}
+        onClose={() => setDetailModal(null)}
+        width="min(760px, 94vw)"
+        title={detailModal ? formatTipoRegistro(detailModal.item.tipo_registro) : ''}
+        titleIcon={detailModal ? getRecordIcon(detailModal.item.tipo_registro) : ''}
+        footer={detailModal && (
+          <>
+            <button type="button" className="btn btn-outline-secondary" onClick={() => setDetailModal(null)}>Cancelar</button>
+            <button type="button" className="btn btn-primary" onClick={() => { const item = detailModal.item; setDetailModal(null); editRecord(item) }}>Editar</button>
+          </>
+        )}
+      >
+        {detailModal && (
+          <>
+            <small className="text-muted d-block mb-2">ID #{detailModal.item.id}</small>
+            <div className="timeline-modal-grid">
+              {buildFieldRows(detailModal.data, detailModal.item).map(([label, value]) => (
+                <div key={label} className="timeline-modal-field">
+                  <small className="text-muted d-block">{label}</small>
+                  <div>{value}</div>
                 </div>
-                <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => setDetailModal(null)}><i className="fa-solid fa-xmark" /></button>
-              </div>
-              <div className="timeline-modal-grid mt-3">
-                {buildFieldRows(detailModal.data, detailModal.item).map(([label, value]) => (
-                  <div key={label} className="timeline-modal-field">
-                    <small className="text-muted d-block">{label}</small>
-                    <div>{value}</div>
-                  </div>
-                ))}
-              </div>
-              <div className="d-flex justify-content-end gap-2 mt-3">
-                <button type="button" className="btn btn-outline-secondary" onClick={() => setDetailModal(null)}>Cancelar</button>
-                <button type="button" className="btn btn-primary" onClick={() => { setDetailModal(null); editRecord(detailModal.item) }}>Editar</button>
-              </div>
+              ))}
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
     </>
   )
 }

@@ -7,7 +7,49 @@ ChartJS.register(BarElement, Tooltip, Legend, CategoryScale, LinearScale, LineEl
 
 function parseDate(value) { return new Date(`${value}T00:00:00`) }
 
-export default function ReportsPage({ vehicleId }) {
+const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia
+  ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  : false
+
+function getChartTheme(darkMode) {
+  return {
+    text: darkMode ? '#e5e7eb' : '#0f172a',
+    grid: darkMode ? 'rgba(148, 163, 184, 0.18)' : 'rgba(15, 23, 42, 0.08)',
+    blue: darkMode ? '#60a5fa' : '#2563eb',
+    green: darkMode ? '#4ade80' : '#16a34a',
+    amber: darkMode ? '#fbbf24' : '#f59e0b',
+    purple: darkMode ? '#c4b5fd' : '#7c3aed',
+  }
+}
+
+function buildChartOptions(theme, extra = {}) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: prefersReducedMotion ? false : { duration: 350 },
+    plugins: {
+      legend: { labels: { color: theme.text } },
+      tooltip: { intersect: false, mode: 'index' },
+      ...(extra.plugins || {}),
+    },
+    scales: {
+      x: { ticks: { color: theme.text }, grid: { color: theme.grid } },
+      y: { ticks: { color: theme.text }, grid: { color: theme.grid } },
+      ...(extra.scales || {}),
+    },
+  }
+}
+
+function ChartEmptyState({ message }) {
+  return (
+    <div className="d-flex flex-column align-items-center justify-content-center text-muted py-4" style={{ minHeight: 180 }}>
+      <i className="fa-solid fa-chart-simple fa-xl mb-2" />
+      <span>{message}</span>
+    </div>
+  )
+}
+
+export default function ReportsPage({ vehicleId, darkMode }) {
   const [timeline, setTimeline] = useState([])
   const [fipeHistory, setFipeHistory] = useState([])
   const [periodMode, setPeriodMode] = useState('mes')
@@ -117,12 +159,23 @@ export default function ReportsPage({ vehicleId }) {
     }
   }, [fipeHistory])
 
+  const theme = getChartTheme(darkMode)
+
   const exportPdf = () => {
+    const content = document.getElementById('reports-print-area')?.innerHTML || ''
     const w = window.open('', '_blank')
-    w.document.write(`<html><head><title>Relatórios Kartrack</title></head><body>${document.getElementById('reports-print-area')?.innerHTML || ''}</body></html>`)
+    if (!w) return
+    w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8" /><title>Relatórios Kartrack</title><style>
+      body { font-family: Inter, system-ui, sans-serif; color: #0f172a; margin: 24px; }
+      h4, h5, h6 { margin: 0 0 8px; }
+      .card { border: 1px solid #dbe2ee; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: none; }
+      ul { margin: 0; padding-left: 18px; }
+      canvas { max-width: 100%; height: auto !important; }
+      button, .btn { display: none !important; }
+    </style></head><body>${content}</body></html>`)
     w.document.close()
     w.focus()
-    w.print()
+    setTimeout(() => w.print(), 250)
   }
 
   if (!vehicleId) return <div className="alert alert-info">Cadastre um veículo para visualizar relatórios.</div>
@@ -146,28 +199,48 @@ export default function ReportsPage({ vehicleId }) {
         <div className="col-xl-6"><div className="card card-body h-100"><h5><i className="fa-solid fa-receipt me-2" />Relatório de despesas por tipo</h5>{Object.keys(expenseByType).length ? <ul className="mb-0">{Object.entries(expenseByType).sort((a, b) => b[1] - a[1]).map(([tipo, total]) => <li key={tipo}><strong>{tipo}:</strong> R$ {Number(total || 0).toFixed(2)}</li>)}</ul> : <p className="text-muted mb-0">Não há despesas no período selecionado.</p>}</div></div>
       </div>
 
-      {periodMode !== 'mes' && Object.keys(mediasPorMes).length > 1 && (
+      {periodMode !== 'mes' && (
         <div className="card card-body">
           <h5><i className="fa-solid fa-chart-line me-2" />Médias por mês</h5>
-          <Line data={{ labels: Object.keys(mediasPorMes), datasets: [{ label: 'Média km/l', data: Object.values(mediasPorMes), borderColor: '#2563eb', tension: 0.25 }] }} />
+          {Object.keys(mediasPorMes).length > 1 ? (
+            <div style={{ height: 300 }}>
+              <Line data={{ labels: Object.keys(mediasPorMes), datasets: [{ label: 'Média km/l', data: Object.values(mediasPorMes), borderColor: theme.blue, backgroundColor: theme.blue, tension: 0.25 }] }} options={buildChartOptions(theme)} />
+            </div>
+          ) : <ChartEmptyState message="Sem dados suficientes de consumo no período." />}
         </div>
       )}
 
       {periodMode === 'mes' && (
         <div className="card card-body">
           <h5><i className="fa-solid fa-chart-column me-2" />Abastecimentos do mês</h5>
-          <Line data={{ labels: abastecimentosMes.labels, datasets: [{ label: 'Valor (R$)', data: abastecimentosMes.valor, borderColor: '#16a34a', tension: 0.25 }, { label: 'Média (km/l)', data: abastecimentosMes.media, borderColor: '#2563eb', tension: 0.25 }] }} />
+          {abastecimentosMes.labels.length ? (
+            <div style={{ height: 300 }}>
+              <Line data={{ labels: abastecimentosMes.labels, datasets: [{ label: 'Valor (R$)', data: abastecimentosMes.valor, borderColor: theme.green, backgroundColor: theme.green, tension: 0.25 }, { label: 'Média (km/l)', data: abastecimentosMes.media, borderColor: theme.blue, backgroundColor: theme.blue, tension: 0.25 }] }} options={buildChartOptions(theme)} />
+            </div>
+          ) : <ChartEmptyState message="Sem abastecimentos no mês selecionado." />}
         </div>
       )}
 
       {fipeVariacao.labels.length > 1 && (
         <div className="card card-body">
           <h5><i className="fa-solid fa-chart-line me-2" />Variação mensal da FIPE</h5>
-          <Line data={{ labels: fipeVariacao.labels, datasets: [{ label: 'Variação mensal (R$)', data: fipeVariacao.valores, borderColor: '#f59e0b', tension: 0.25 }] }} />
+          <div style={{ height: 300 }}>
+            <Line data={{ labels: fipeVariacao.labels, datasets: [{ label: 'Variação mensal (R$)', data: fipeVariacao.valores, borderColor: theme.amber, backgroundColor: theme.amber, tension: 0.25 }] }} options={buildChartOptions(theme)} />
+          </div>
         </div>
       )}
 
-      <div className="card card-body"><h5><i className="fa-solid fa-scale-balanced me-2" />Comparativo</h5><Bar data={{ labels: ['Abastecimentos', 'Despesas'], datasets: [{ label: 'Total (R$)', data: [fuelRecordsWithoutFirst.reduce((s, i) => s + Number(i.valor || 0), 0), expenseRecords.filter((i) => i.tipo_registro !== 'fipe').reduce((s, i) => s + Number(i.valor || 0), 0)], backgroundColor: ['#2563eb', '#7c3aed'], borderRadius: 10 }] }} options={{ responsive: true, plugins: { legend: { display: false } } }} /></div>
+      <div className="card card-body">
+        <h5><i className="fa-solid fa-scale-balanced me-2" />Comparativo</h5>
+        {fuelRecordsWithoutFirst.length || expenseRecords.length ? (
+          <div style={{ height: 300 }}>
+            <Bar
+              data={{ labels: ['Abastecimentos', 'Despesas'], datasets: [{ label: 'Total (R$)', data: [fuelRecordsWithoutFirst.reduce((s, i) => s + Number(i.valor || 0), 0), expenseRecords.filter((i) => i.tipo_registro !== 'fipe').reduce((s, i) => s + Number(i.valor || 0), 0)], backgroundColor: [theme.blue, theme.purple], borderRadius: 10 }] }}
+              options={buildChartOptions(theme, { plugins: { legend: { display: false } } })}
+            />
+          </div>
+        ) : <ChartEmptyState message="Sem dados no período selecionado." />}
+      </div>
     </div>
   )
 }

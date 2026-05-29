@@ -29,6 +29,7 @@ export default function LoginPage({ onLogin }) {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   const goToLoginMode = () => {
     setIsRegister(false)
@@ -77,32 +78,53 @@ export default function LoginPage({ onLogin }) {
       </div>
       <form className="login-form-panel" onSubmit={submit}>
         {isRegister && (
+          <div className="mb-2">
+            <label className="form-label" htmlFor="login-name">Nome</label>
+            <input
+              id="login-name"
+              className="form-control"
+              placeholder="Seu nome"
+              autoComplete="name"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              minLength={2}
+              required
+            />
+          </div>
+        )}
+        <div className="mb-2">
+          <label className="form-label" htmlFor="login-email">E-mail</label>
           <input
-            className="form-control mb-2"
-            placeholder="Nome"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            minLength={2}
+            id="login-email"
+            className="form-control"
+            placeholder="voce@exemplo.com"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
             required
           />
-        )}
-        <input
-          className="form-control mb-2"
-          placeholder="E-mail"
-          type="email"
-          value={form.email}
-          onChange={(e) => setForm({ ...form, email: e.target.value })}
-          required
-        />
-        <input
-          className={`form-control ${isRegister ? 'mb-1' : 'mb-3'}`}
-          placeholder="Senha"
-          type="password"
-          value={form.password}
-          onChange={(e) => setForm({ ...form, password: e.target.value })}
-          minLength={6}
-          required
-        />
+        </div>
+        <div className={isRegister ? 'mb-1' : 'mb-3'}>
+          <label className="form-label" htmlFor="login-password">Senha</label>
+          <div className="input-group">
+            <input
+              id="login-password"
+              className="form-control"
+              placeholder="Sua senha"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete={isRegister ? 'new-password' : 'current-password'}
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              minLength={6}
+              required
+            />
+            <button type="button" className="btn btn-outline-secondary" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>
+              <i className={`fa-solid ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`} />
+            </button>
+          </div>
+        </div>
         {isRegister && <small className="text-muted d-block mt-2 mb-3">A senha deve conter pelo menos 6 caracteres.</small>}
 
         {success && <div className="alert alert-success py-2">{success}</div>}

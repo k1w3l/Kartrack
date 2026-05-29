@@ -16,7 +16,20 @@ Sistema web para registrar **abastecimentos, despesas e histórico do veículo**
 
 ## Instalação
 
-1. Crie o arquivo `docker-compose.yml` com o conteúdo abaixo e ajuste as variáveis conforme seu ambiente:
+1. Crie um arquivo `.env` ao lado do `docker-compose.yml` com **valores próprios** (sem esses ajustes a aplicação não sobe — veja as notas abaixo):
+
+   ```env
+   # Gere uma chave forte e única: python -c "import secrets; print(secrets.token_urlsafe(48))"
+   SECRET_KEY=defina-uma-chave-forte
+   DB_USER=kartrack
+   DB_PASSWORD=defina-uma-senha-forte
+   DB_ROOT_PASSWORD=defina-uma-senha-root
+   DB_NAME=kartrack
+   # Domínio do frontend (separe por vírgula se houver mais de um)
+   CORS_ORIGINS=http://localhost:8000
+   ```
+
+2. Crie o arquivo `docker-compose.yml` com o conteúdo abaixo:
 
 ```yaml
 services:
@@ -25,57 +38,78 @@ services:
     restart: always
     container_name: kartrack_db
     environment:
-      MYSQL_DATABASE: kartrack
-      MYSQL_USER: kartrack
-      MYSQL_PASSWORD: kartrack
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: ${DB_NAME:-kartrack}
+      MYSQL_USER: ${DB_USER:-kartrack}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD no .env}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?defina DB_ROOT_PASSWORD no .env}
       TZ: America/Sao_Paulo
+    # Porta exposta só no localhost (acesso administrativo). Remova se não precisar.
+    ports:
+      - "127.0.0.1:3306:3306"
     volumes:
       - ./data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
       interval: 5s
       timeout: 5s
       retries: 20
       start_period: 10s
 
   app:
-    image: kiwel/kartrack:v1
+    image: kiwel/kartrack:latest
     restart: always
     container_name: kartrack
+    env_file:
+      - .env
     environment:
-      SECRET_KEY: troque-esta-chave
       DB_HOST: db
-      DB_USER: kartrack
-      DB_PASSWORD: kartrack
-      DB_NAME: kartrack
       TZ: America/Sao_Paulo
     volumes:
       - ./uploads/vehicles:/app/uploads/vehicles
     ports:
       - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=3).status == 200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     depends_on:
       db:
         condition: service_healthy
 ```
 
-2. Suba o ambiente:
+3. Ajuste a permissão do diretório de uploads — o container roda como usuário **não-root (uid 1000)** e precisa gravar as fotos dos veículos:
+
+   ```bash
+   mkdir -p uploads/vehicles
+   sudo chown -R 1000:1000 uploads
+   ```
+
+4. Suba o ambiente:
    ```bash
    docker compose up -d
    ```
 
-3. Acesse: **http://localhost:8000**
+5. Acesse: **http://localhost:8000**
+
+> **Atualizando uma instalação existente:** `docker compose pull && docker compose up -d`. Se vier de uma versão antiga (container como root), rode o `chown` do passo 3 antes de subir.
 
 ## Variáveis de ambiente do serviço `app`
 
-| Variável       | Descrição                                 | Padrão        |
-|----------------|-------------------------------------------|---------------|
-| `SECRET_KEY`   | Chave secreta para assinatura dos tokens JWT — **altere em produção** | `change-me` |
-| `DB_HOST`      | Host do banco de dados                    | `db`          |
-| `DB_USER`      | Usuário do banco                          | `cartrack`    |
-| `DB_PASSWORD`  | Senha do banco                            | `cartrack`    |
-| `DB_NAME`      | Nome do banco                             | `cartrack`    |
-| `DB_PORT`      | Porta do banco                            | `3306`        |
+| Variável           | Descrição                                                                 | Padrão                  |
+|--------------------|---------------------------------------------------------------------------|-------------------------|
+| `SECRET_KEY`       | Chave para assinatura dos tokens JWT. **Obrigatória** — a aplicação **não inicia** se ficar no valor padrão | `change-me` |
+| `CORS_ORIGINS`     | Origens permitidas para CORS (separadas por vírgula). Use o domínio real em produção | `http://localhost:5173` |
+| `MAX_UPLOAD_BYTES` | Tamanho máximo do upload de imagem, em bytes                              | `5242880` (5 MB)        |
+| `DB_HOST`          | Host do banco de dados                                                    | `db`                    |
+| `DB_USER`          | Usuário do banco                                                          | `cartrack`              |
+| `DB_PASSWORD`      | Senha do banco (**obrigatória** no `.env` para o compose)                 | `cartrack`              |
+| `DB_ROOT_PASSWORD` | Senha root do MySQL (**obrigatória** no `.env`; usada só pelo serviço `db`) | —                       |
+| `DB_NAME`          | Nome do banco                                                             | `cartrack`              |
+| `DB_PORT`          | Porta do banco                                                            | `3306`                  |
+
+> **Segurança:** o login e o cadastro têm *rate limit* (10/min e 5/min por IP). Atrás de um proxy reverso, repasse o header `X-Forwarded-For` para que o limite use o IP real do cliente.
 
 ## Personalização da marca
 

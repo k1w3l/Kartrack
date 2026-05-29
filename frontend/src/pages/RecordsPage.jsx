@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api'
+import { useUI } from '../components/UIProvider'
 
 const COMMON_BULK_FIELDS = [
   { value: 'data', label: 'Data', input: 'date', apiField: 'data' },
@@ -45,6 +46,8 @@ const DATA_TYPE_FIELDS = [
 
 export default function RecordsPage({ vehicleId }) {
   const navigate = useNavigate()
+  const { confirm, toast } = useUI()
+  const [applyingBulk, setApplyingBulk] = useState(false)
   const [timeline, setTimeline] = useState([])
   const [bulkFilter, setBulkFilter] = useState('todos')
   const [bulkAction, setBulkAction] = useState('descricao')
@@ -110,7 +113,8 @@ export default function RecordsPage({ vehicleId }) {
   const bulkFieldConfig = bulkFieldOptions.find((field) => field.value === bulkAction) || bulkFieldOptions[0]
 
   const applyBulkEdit = async () => {
-    if (!targetRecords.length || bulkValue === '') return
+    if (!targetRecords.length || bulkValue === '' || applyingBulk) return
+    setApplyingBulk(true)
     try {
       for (const record of targetRecords) {
         if (record.tipo_registro === 'abastecimento') {
@@ -128,31 +132,37 @@ export default function RecordsPage({ vehicleId }) {
         }
       }
 
-      alert('Edição em massa aplicada com sucesso.')
+      toast.success('Edição em massa aplicada com sucesso.')
       setBulkValue('')
       setSelectedIds([])
       await loadTimeline()
     } catch {
-      alert('Falha ao aplicar edição em massa.')
+      toast.error('Falha ao aplicar edição em massa.')
+    } finally {
+      setApplyingBulk(false)
     }
   }
 
   const deleteRecords = async (records) => {
     if (!records.length) return
-    if (!window.confirm(`Deseja excluir ${records.length} registro(s)?`)) return
+    const ok = await confirm({ title: 'Excluir registros', message: `Deseja excluir ${records.length} registro(s)?`, confirmLabel: 'Excluir', danger: true })
+    if (!ok) return
     for (const record of records) {
       if (record.tipo_registro === 'abastecimento') await api.delete(`/fuel/${record.id}`)
       else await api.delete(`/expenses/${record.id}`)
     }
     setSelectedIds([])
     await loadTimeline()
+    toast.success(`${records.length} registro(s) excluído(s).`)
   }
 
   const deleteAllRecords = async () => {
-    if (!window.confirm('Deseja excluir TODOS os registros cadastrados?')) return
+    const ok = await confirm({ title: 'Excluir todos os registros', message: 'Deseja excluir TODOS os registros cadastrados? Esta ação não pode ser desfeita.', confirmLabel: 'Excluir tudo', danger: true })
+    if (!ok) return
     await api.delete('/records/all')
     setSelectedIds([])
     await loadTimeline()
+    toast.success('Todos os registros foram excluídos.')
   }
 
   const toggleSelected = (record) => {
@@ -179,7 +189,7 @@ export default function RecordsPage({ vehicleId }) {
       const { data } = await api.post('/lookup', { category: key, value: trimmed })
       setDataTypes((prev) => ({ ...prev, [key]: [...(prev[key] || []), data] }))
     } catch {
-      alert('Item já cadastrado.')
+      toast.error('Item já cadastrado.')
     }
   }
 
@@ -244,8 +254,8 @@ export default function RecordsPage({ vehicleId }) {
                 />
               </div>
               <div className="col-md-2 d-flex align-items-end">
-                <button type="button" className="btn btn-primary w-100" onClick={applyBulkEdit}>
-                  <i className="fa-solid fa-wand-magic-sparkles me-2" />Aplicar
+                <button type="button" className="btn btn-primary w-100" onClick={applyBulkEdit} disabled={applyingBulk}>
+                  {applyingBulk ? <><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />Aplicando...</> : <><i className="fa-solid fa-wand-magic-sparkles me-2" />Aplicar</>}
                 </button>
               </div>
             </div>
