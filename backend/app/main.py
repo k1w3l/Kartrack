@@ -974,11 +974,13 @@ def import_csv(
         )
     reader = csv.DictReader(StringIO(content))
     imported = {"abastecimentos": 0, "despesas": 0}
+    erros: list[str] = []
 
     only_fuel = mode == "abastecimentos"
     only_expenses = mode == "despesas"
 
-    for row in reader:
+    # A linha 1 é o cabeçalho; os dados começam na linha 2.
+    for line_no, row in enumerate(reader, start=2):
         categoria = (row.get("categoria") or "").strip().lower()
         is_fuel = categoria == "abastecimento"
 
@@ -987,52 +989,59 @@ def import_csv(
         if only_expenses and is_fuel:
             continue
 
-        if is_fuel:
-            litros = float(row.get("litros") or 0)
-            valor_total = float(row.get("valor") or 0)
-            bandeira = (row.get("bandeira") or "").strip()
-            local = (row.get("local") or "").strip()
-            posto = f"{bandeira} - {local}" if bandeira and local else (local or row.get("posto") or "Não informado")
-            db.add(
-                FuelRecord(
-                    vehicle_id=vehicle_id,
-                    data=datetime.strptime(row.get("data"), "%Y-%m-%d").date(),
-                    quilometragem=float(row.get("quilometragem") or 0),
-                    tipo_combustivel=row.get("tipo_combustivel") or "Gasolina Comum",
-                    litros=litros,
-                    valor_total=valor_total,
-                    valor_litro=(valor_total / litros if litros else 0),
-                    tanque_cheio=str(row.get("tanque_cheio") or "").strip().lower() in {"1", "true", "sim", "yes", "y"},
-                    posto=posto,
-                    descricao=row.get("descricao") or "",
-                )
-            )
-            imported["abastecimentos"] += 1
-        else:
-            descricao_parts = []
-            for key in ("pecas", "descricao_servico", "valor_pecas", "valor_servico", "parcelas", "valor_parcela", "classe_bonus"):
-                val = row.get(key)
-                if val not in (None, ""):
-                    descricao_parts.append(f"{key}: {val}")
+        try:
+            data_valor = datetime.strptime((row.get("data") or "").strip(), "%Y-%m-%d").date()
 
-            descricao_extra = " • ".join(descricao_parts)
-            descricao_base = row.get("descricao") or ""
-            descricao_final = f"{descricao_base} • {descricao_extra}".strip(" •") if descricao_extra else descricao_base
-            db.add(
-                ExpenseRecord(
-                    vehicle_id=vehicle_id,
-                    tipo=categoria or "outros",
-                    data=datetime.strptime(row.get("data"), "%Y-%m-%d").date(),
-                    quilometragem=float(row.get("quilometragem") or 0) or None,
-                    local=row.get("local") or "",
-                    descricao=descricao_final,
-                    valor=float(row.get("valor") or 0),
-                    status=row.get("status") or "registrado",
+            if is_fuel:
+                litros = float(row.get("litros") or 0)
+                valor_total = float(row.get("valor") or 0)
+                bandeira = (row.get("bandeira") or "").strip()
+                local = (row.get("local") or "").strip()
+                posto = f"{bandeira} - {local}" if bandeira and local else (local or row.get("posto") or "Não informado")
+                db.add(
+                    FuelRecord(
+                        vehicle_id=vehicle_id,
+                        data=data_valor,
+                        quilometragem=float(row.get("quilometragem") or 0),
+                        tipo_combustivel=row.get("tipo_combustivel") or "Gasolina Comum",
+                        litros=litros,
+                        valor_total=valor_total,
+                        valor_litro=(valor_total / litros if litros else 0),
+                        tanque_cheio=str(row.get("tanque_cheio") or "").strip().lower() in {"1", "true", "sim", "yes", "y"},
+                        posto=posto,
+                        descricao=row.get("descricao") or "",
+                    )
                 )
-            )
-            imported["despesas"] += 1
+                imported["abastecimentos"] += 1
+            else:
+                descricao_parts = []
+                for key in ("pecas", "descricao_servico", "valor_pecas", "valor_servico", "parcelas", "valor_parcela", "classe_bonus"):
+                    val = row.get(key)
+                    if val not in (None, ""):
+                        descricao_parts.append(f"{key}: {val}")
+
+                descricao_extra = " • ".join(descricao_parts)
+                descricao_base = row.get("descricao") or ""
+                descricao_final = f"{descricao_base} • {descricao_extra}".strip(" •") if descricao_extra else descricao_base
+                db.add(
+                    ExpenseRecord(
+                        vehicle_id=vehicle_id,
+                        tipo=categoria or "outros",
+                        data=data_valor,
+                        quilometragem=float(row.get("quilometragem") or 0) or None,
+                        local=row.get("local") or "",
+                        descricao=descricao_final,
+                        valor=float(row.get("valor") or 0),
+                        status=row.get("status") or "registrado",
+                    )
+                )
+                imported["despesas"] += 1
+        except (ValueError, TypeError) as exc:
+            if len(erros) < 50:
+                erros.append(f"Linha {line_no}: dados inválidos ({exc})")
+
     db.commit()
-    return imported
+    return {**imported, "erros": erros}
 
 
 @app.get(f"{settings.api_prefix}/records/export")
@@ -1162,10 +1171,23 @@ def system_restore(payload: dict = Body(...), db: Session = Depends(get_db), cur
     fuels_payload = payload.get("fuels") or []
     expenses_payload = payload.get("expenses") or []
 
+    try:
+        return _apply_restore(db, current_user, vehicles_payload, fuels_payload, expenses_payload)
+    except HTTPException:
+        raise
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="Backup inválido ou corrompido. Nenhum dado foi alterado.",
+        )
+
+
+def _apply_restore(db, current_user, vehicles_payload, fuels_payload, expenses_payload):
     existing = db.query(Vehicle).filter(Vehicle.user_id == current_user.id).all()
     for v in existing:
         db.delete(v)
-    db.commit()
+    db.flush()
 
     id_map = {}
     for v in vehicles_payload:

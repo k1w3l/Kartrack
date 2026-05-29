@@ -20,4 +20,19 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+// Sessão expirada/invalida: limpa o token e notifica o App para voltar ao login.
+// Ignora as rotas de autenticação (o 401 ali é tratado na própria tela de login).
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status
+    const url = error?.config?.url || ''
+    if (status === 401 && !url.includes('/auth/')) {
+      localStorage.removeItem('token')
+      window.dispatchEvent(new Event('auth:unauthorized'))
+    }
+    return Promise.reject(error)
+  },
+)
+
 export default api
