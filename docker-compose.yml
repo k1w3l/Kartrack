@@ -24,7 +24,7 @@ services:
 
   app:
     build: .
-    image: kiwel/kartrack:v1
+    image: kiwel/kartrack:latest
     restart: always
     container_name: kartrack
     env_file:
