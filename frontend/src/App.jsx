@@ -123,7 +123,7 @@ export default function App() {
     return () => window.removeEventListener('auth:unauthorized', handleUnauthorized)
   }, [])
 
-  if (!user) return <LoginPage onLogin={loadUser} />
+  if (!user) return <LoginPage onLogin={loadUser} darkMode={darkMode} onToggleTheme={toggleTheme} />
 
   return (
     <Layout

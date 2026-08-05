@@ -22,7 +22,7 @@ function getApiErrorMessage(error, isRegister) {
   return fallback
 }
 
-export default function LoginPage({ onLogin }) {
+export default function LoginPage({ onLogin, darkMode, onToggleTheme }) {
   const apiOrigin = API_BASE_URL.replace(/\/api\/?$/, '')
   const [isRegister, setIsRegister] = useState(false)
   const [form, setForm] = useState({ name: '', email: '', password: '' })
@@ -70,10 +70,24 @@ export default function LoginPage({ onLogin }) {
   }
 
   return (
-    <div className="container py-5" style={{ maxWidth: 500 }}>
+    <div className="position-relative min-vh-100">
+      <button
+        type="button"
+        className="btn btn-outline-secondary btn-sm icon-btn position-absolute top-0 end-0 m-3"
+        onClick={onToggleTheme}
+        aria-pressed={darkMode}
+        title={darkMode ? 'Ativar tema claro' : 'Ativar tema escuro'}
+      >
+        <i className={`fa-solid ${darkMode ? 'fa-toggle-on' : 'fa-toggle-off'}`} />
+      </button>
+      <div className="container py-5" style={{ maxWidth: 500 }}>
       <div className="text-center mb-4">
         <div className="login-logo">
-          <img src={`${apiOrigin}/uploads/logo_light.svg`} alt="Kartrack" onError={(e) => { e.currentTarget.style.display = 'none' }} />
+          <img
+            src={`${apiOrigin}/uploads/${darkMode ? 'logo_dark.svg' : 'logo_light.svg'}`}
+            alt="Kartrack"
+            onError={(e) => { e.currentTarget.style.display = 'none' }}
+          />
         </div>
       </div>
       <form className="login-form-panel" onSubmit={submit}>
@@ -145,6 +159,7 @@ export default function LoginPage({ onLogin }) {
           {isRegister ? 'Já tenho conta' : 'Primeiro acesso? Crie sua conta.'}
         </button>
       </form>
+      </div>
     </div>
   )
 }
