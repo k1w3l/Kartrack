@@ -27,7 +27,7 @@ api.interceptors.response.use(
   (error) => {
     const status = error?.response?.status
     const url = error?.config?.url || ''
-    if (status === 401 && !url.includes('/auth/')) {
+    if (status === 401 && !url.includes('/auth/') && !url.includes('/fipe/')) {
       localStorage.removeItem('token')
       window.dispatchEvent(new Event('auth:unauthorized'))
     }

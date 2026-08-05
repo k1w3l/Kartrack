@@ -194,6 +194,34 @@ small, .text-muted {
   object-fit: contain;
 }
 
+.login-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.login-tab {
+  border: 1px solid var(--border, rgba(15, 23, 42, 0.12));
+  background: transparent;
+  color: var(--muted, #64748b);
+  border-radius: 0.5rem;
+  padding: 0.55rem 0.75rem;
+  font-weight: 600;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.login-tab.active {
+  background: var(--primary, #2563eb);
+  border-color: var(--primary, #2563eb);
+  color: #fff;
+}
+
+.fipe-lookup-price {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
 .icon-btn {
   min-width: 44px;
   min-height: 44px;

@@ -553,14 +553,16 @@ def delete_vehicle(
 
 
 @app.get(f"{settings.api_prefix}/fipe/brands", response_model=list[FipeOption])
-def fipe_brands(vehicle_type: str = "cars", current_user: User = Depends(get_current_user)):
+@limiter.limit("30/minute")
+def fipe_brands(request: Request, vehicle_type: str = "cars"):
     vehicle_type = _validate_vehicle_type(vehicle_type)
     data = _fipe_get(f"{vehicle_type}/brands")
     return [FipeOption(codigo=str(item.get("code")), nome=item.get("name") or "") for item in data]
 
 
 @app.get(f"{settings.api_prefix}/fipe/models", response_model=list[FipeOption])
-def fipe_models(vehicle_type: str = "cars", brand_id: int = 0, current_user: User = Depends(get_current_user)):
+@limiter.limit("30/minute")
+def fipe_models(request: Request, vehicle_type: str = "cars", brand_id: int = 0):
     vehicle_type = _validate_vehicle_type(vehicle_type)
     if not brand_id:
         return []
@@ -569,7 +571,8 @@ def fipe_models(vehicle_type: str = "cars", brand_id: int = 0, current_user: Use
 
 
 @app.get(f"{settings.api_prefix}/fipe/years", response_model=list[FipeOption])
-def fipe_years(vehicle_type: str = "cars", brand_id: int = 0, model_id: int = 0, current_user: User = Depends(get_current_user)):
+@limiter.limit("30/minute")
+def fipe_years(request: Request, vehicle_type: str = "cars", brand_id: int = 0, model_id: int = 0):
     vehicle_type = _validate_vehicle_type(vehicle_type)
     if not brand_id or not model_id:
         return []
@@ -578,7 +581,8 @@ def fipe_years(vehicle_type: str = "cars", brand_id: int = 0, model_id: int = 0,
 
 
 @app.get(f"{settings.api_prefix}/fipe/price")
-def fipe_price(vehicle_type: str = "cars", brand_id: int = 0, model_id: int = 0, year_code: str = "", current_user: User = Depends(get_current_user)):
+@limiter.limit("20/minute")
+def fipe_price(request: Request, vehicle_type: str = "cars", brand_id: int = 0, model_id: int = 0, year_code: str = ""):
     vehicle_type = _validate_vehicle_type(vehicle_type)
     if not brand_id or not model_id or not year_code:
         raise HTTPException(status_code=400, detail="Parâmetros FIPE incompletos")

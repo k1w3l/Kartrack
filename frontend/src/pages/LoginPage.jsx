@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import api, { API_BASE_URL } from '../api'
+import FipeLookupForm from '../components/FipeLookupForm'
 
 function getApiErrorMessage(error, isRegister) {
   const fallback = isRegister ? 'Falha no cadastro' : 'Falha no login'
@@ -24,6 +25,7 @@ function getApiErrorMessage(error, isRegister) {
 
 export default function LoginPage({ onLogin, darkMode, onToggleTheme }) {
   const apiOrigin = API_BASE_URL.replace(/\/api\/?$/, '')
+  const [activeTab, setActiveTab] = useState('login')
   const [isRegister, setIsRegister] = useState(false)
   const [form, setForm] = useState({ name: '', email: '', password: '' })
   const [error, setError] = useState('')
@@ -81,84 +83,113 @@ export default function LoginPage({ onLogin, darkMode, onToggleTheme }) {
         <i className={`fa-solid ${darkMode ? 'fa-toggle-on' : 'fa-toggle-off'}`} />
       </button>
       <div className="container py-5" style={{ maxWidth: 500 }}>
-      <div className="text-center mb-4">
-        <div className="login-logo">
-          <img
-            src={`${apiOrigin}/uploads/${darkMode ? 'logo_dark.svg' : 'logo_light.svg'}`}
-            alt="Kartrack"
-            onError={(e) => { e.currentTarget.style.display = 'none' }}
-          />
-        </div>
-      </div>
-      <form className="login-form-panel" onSubmit={submit}>
-        {isRegister && (
-          <div className="mb-2">
-            <label className="form-label" htmlFor="login-name">Nome</label>
-            <input
-              id="login-name"
-              className="form-control"
-              placeholder="Seu nome"
-              autoComplete="name"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              minLength={2}
-              required
+        <div className="text-center mb-4">
+          <div className="login-logo">
+            <img
+              src={`${apiOrigin}/uploads/${darkMode ? 'logo_dark.svg' : 'logo_light.svg'}`}
+              alt="Kartrack"
+              onError={(e) => { e.currentTarget.style.display = 'none' }}
             />
+          </div>
+        </div>
+
+        <div className="login-tabs mb-3" role="tablist" aria-label="Acesso e consulta FIPE">
+          <button
+            type="button"
+            role="tab"
+            className={`login-tab ${activeTab === 'login' ? 'active' : ''}`}
+            aria-selected={activeTab === 'login'}
+            onClick={() => setActiveTab('login')}
+          >
+            Login
+          </button>
+          <button
+            type="button"
+            role="tab"
+            className={`login-tab ${activeTab === 'fipe' ? 'active' : ''}`}
+            aria-selected={activeTab === 'fipe'}
+            onClick={() => setActiveTab('fipe')}
+          >
+            Consultar FIPE
+          </button>
+        </div>
+
+        {activeTab === 'login' ? (
+          <form className="login-form-panel" onSubmit={submit} role="tabpanel">
+            {isRegister && (
+              <div className="mb-2">
+                <label className="form-label" htmlFor="login-name">Nome</label>
+                <input
+                  id="login-name"
+                  className="form-control"
+                  placeholder="Seu nome"
+                  autoComplete="name"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  minLength={2}
+                  required
+                />
+              </div>
+            )}
+            <div className="mb-2">
+              <label className="form-label" htmlFor="login-email">E-mail</label>
+              <input
+                id="login-email"
+                className="form-control"
+                placeholder="voce@exemplo.com"
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                required
+              />
+            </div>
+            <div className={isRegister ? 'mb-1' : 'mb-3'}>
+              <label className="form-label" htmlFor="login-password">Senha</label>
+              <div className="input-group">
+                <input
+                  id="login-password"
+                  className="form-control"
+                  placeholder="Sua senha"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete={isRegister ? 'new-password' : 'current-password'}
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  minLength={6}
+                  required
+                />
+                <button type="button" className="btn btn-outline-secondary" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>
+                  <i className={`fa-solid ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`} />
+                </button>
+              </div>
+            </div>
+            {isRegister && <small className="text-muted d-block mt-2 mb-3">A senha deve conter pelo menos 6 caracteres.</small>}
+
+            {success && <div className="alert alert-success py-2">{success}</div>}
+            {error && <div className="alert alert-danger py-2">{error}</div>}
+
+            <button className="btn btn-primary w-100" disabled={loading}>
+              {loading ? 'Processando...' : isRegister ? 'Cadastrar' : 'Entrar'}
+            </button>
+            <button
+              type="button"
+              className="btn btn-link mt-2 w-100 text-center"
+              onClick={() => {
+                setError('')
+                setSuccess('')
+                setIsRegister(!isRegister)
+              }}
+            >
+              {isRegister ? 'Já tenho conta' : 'Primeiro acesso? Crie sua conta.'}
+            </button>
+          </form>
+        ) : (
+          <div className="login-form-panel" role="tabpanel">
+            <p className="text-muted small mb-3">Consulte o valor de mercado na tabela FIPE sem precisar entrar na conta.</p>
+            <FipeLookupForm />
           </div>
         )}
-        <div className="mb-2">
-          <label className="form-label" htmlFor="login-email">E-mail</label>
-          <input
-            id="login-email"
-            className="form-control"
-            placeholder="voce@exemplo.com"
-            type="email"
-            inputMode="email"
-            autoComplete="email"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-            required
-          />
-        </div>
-        <div className={isRegister ? 'mb-1' : 'mb-3'}>
-          <label className="form-label" htmlFor="login-password">Senha</label>
-          <div className="input-group">
-            <input
-              id="login-password"
-              className="form-control"
-              placeholder="Sua senha"
-              type={showPassword ? 'text' : 'password'}
-              autoComplete={isRegister ? 'new-password' : 'current-password'}
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-              minLength={6}
-              required
-            />
-            <button type="button" className="btn btn-outline-secondary" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>
-              <i className={`fa-solid ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`} />
-            </button>
-          </div>
-        </div>
-        {isRegister && <small className="text-muted d-block mt-2 mb-3">A senha deve conter pelo menos 6 caracteres.</small>}
-
-        {success && <div className="alert alert-success py-2">{success}</div>}
-        {error && <div className="alert alert-danger py-2">{error}</div>}
-
-        <button className="btn btn-primary w-100" disabled={loading}>
-          {loading ? 'Processando...' : isRegister ? 'Cadastrar' : 'Entrar'}
-        </button>
-        <button
-          type="button"
-          className="btn btn-link mt-2 w-100 text-center"
-          onClick={() => {
-            setError('')
-            setSuccess('')
-            setIsRegister(!isRegister)
-          }}
-        >
-          {isRegister ? 'Já tenho conta' : 'Primeiro acesso? Crie sua conta.'}
-        </button>
-      </form>
       </div>
     </div>
   )
