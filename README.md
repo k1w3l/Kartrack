@@ -116,14 +116,14 @@ services:
 Os arquivos de marca padrão estão embutidos na imagem. Para substituí-los, copie os arquivos para dentro do container e reinicie:
 
 ```bash
-docker cp logo_light.png kartrack:/app/uploads/logo_light.png
-docker cp logo_dark.png  kartrack:/app/uploads/logo_dark.png
-docker cp favicon.ico    kartrack:/app/uploads/favicon.ico
+docker cp logo_light.svg kartrack:/app/uploads/logo_light.svg
+docker cp logo_dark.svg  kartrack:/app/uploads/logo_dark.svg
+docker cp favicon.svg    kartrack:/app/uploads/favicon.svg
 ```
 
-- `logo_light.png` — logo exibida no tema claro
-- `logo_dark.png` — logo exibida no tema escuro
-- `favicon.ico` — ícone do navegador
+- `logo_light.svg` — logo exibida no tema claro
+- `logo_dark.svg` — logo exibida no tema escuro
+- `favicon.svg` — ícone do navegador
 
 Recarregue a página após substituir.
 

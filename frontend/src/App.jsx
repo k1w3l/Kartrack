@@ -45,7 +45,7 @@ export default function App() {
   }, [location.pathname])
 
   useEffect(() => {
-    const href = `${apiOrigin}/uploads/favicon.ico`
+    const href = `${apiOrigin}/uploads/favicon.svg`
     let link = document.querySelector("link[rel='icon']")
     if (!link) {
       link = document.createElement('link')
@@ -53,7 +53,7 @@ export default function App() {
       document.head.appendChild(link)
     }
     link.setAttribute('href', href)
-    link.setAttribute('sizes', '64x64')
+    link.setAttribute('type', 'image/svg+xml')
     let shortcut = document.querySelector("link[rel='shortcut icon']")
     if (!shortcut) {
       shortcut = document.createElement('link')
@@ -61,7 +61,7 @@ export default function App() {
       document.head.appendChild(shortcut)
     }
     shortcut.setAttribute('href', href)
-    shortcut.setAttribute('sizes', '64x64')
+    shortcut.setAttribute('type', 'image/svg+xml')
   }, [apiOrigin])
 
   const loadUser = async () => {

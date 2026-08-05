@@ -69,7 +69,7 @@ export default function Layout({ user, apiOrigin, children, onToggleTheme, darkM
           <Link className="logo-link" to="/" title="Ir para a linha do tempo">
             <img
               className="app-logo me-2"
-              src={`${apiOrigin}/uploads/${darkMode ? 'logo_dark.png' : 'logo_light.png'}`}
+              src={`${apiOrigin}/uploads/${darkMode ? 'logo_dark.svg' : 'logo_light.svg'}`}
               alt="Kartrack"
               onError={(e) => { e.currentTarget.style.display = 'none' }}
             />

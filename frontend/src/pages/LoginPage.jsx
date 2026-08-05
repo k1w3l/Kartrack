@@ -73,7 +73,7 @@ export default function LoginPage({ onLogin }) {
     <div className="container py-5" style={{ maxWidth: 500 }}>
       <div className="text-center mb-4">
         <div className="login-logo">
-          <img src={`${apiOrigin}/uploads/logo_light.png`} alt="Kartrack" onError={(e) => { e.currentTarget.style.display = 'none' }} />
+          <img src={`${apiOrigin}/uploads/logo_light.svg`} alt="Kartrack" onError={(e) => { e.currentTarget.style.display = 'none' }} />
         </div>
       </div>
       <form className="login-form-panel" onSubmit={submit}>
