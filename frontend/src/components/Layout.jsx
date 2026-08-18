@@ -3,6 +3,7 @@ import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import api from '../api'
 import { useUI } from './UIProvider'
 import Icon from './Icon'
+import RemindersBell from './RemindersBell'
 
 const railGroups = [
   {
@@ -138,6 +139,7 @@ export default function Layout({
               ))}
             </select>
           )}
+          <RemindersBell vehicleId={vehicleId} />
           <button type="button" className="btn btn-ghost icon-btn" onClick={onToggleTheme} aria-pressed={darkMode} title={darkMode ? 'Ativar tema claro' : 'Ativar tema escuro'}>
             <Icon name={darkMode ? 'sun' : 'moon'} />
           </button>

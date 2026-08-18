@@ -194,7 +194,6 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
   const [tipoFiltro, setTipoFiltro] = useState('todos')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
-  const [selectedReminderIds, setSelectedReminderIds] = useState([])
   const [filtersHydrated, setFiltersHydrated] = useState(false)
   const [detailModal, setDetailModal] = useState(null)
   const [expandedIds, setExpandedIds] = useState([])
@@ -231,10 +230,6 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
       document.removeEventListener('visibilitychange', onVisible)
     }
   }, [vehicleId])
-
-  useEffect(() => {
-    setSelectedReminderIds([])
-  }, [vehicleId, dashboard?.lembretes?.length])
 
   useEffect(() => {
     if (!vehicleId) return
@@ -466,35 +461,6 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
         <MetricCard icon="banknote" title="Custo total" value={brl.format(metricas.custoTotal)} />
         <MetricCard icon="gauge" title="Média de consumo" value={`${metricas.mediaConsumo.toFixed(2)} km/l`} />
         <MetricCard icon="route" title="Km rodado" value={`${metricas.quilometragemMensal.toFixed(0)} km`} />
-      </div>
-
-      <div className="card">
-        <h3 className="section-title"><Icon name="bell" size={16} />Lembretes de manutenção</h3>
-        {dashboard.lembretes.length ? (
-          <div className="lamp-list">
-            {dashboard.lembretes.map((raw) => {
-              const [id, l] = String(raw).split('::')
-              const days = Number((String(l).match(/faltam\s+(-?\d+)\s+dias/i) || [])[1])
-              const kms = Number((String(l).match(/faltam\s+(-?\d+)\s+km/i) || [])[1])
-              const isDanger = Number.isFinite(days) ? days <= 30 : Number.isFinite(kms) ? kms <= 1000 : false
-              const isWarning = !isDanger && (Number.isFinite(days) ? days <= 60 : Number.isFinite(kms) ? kms <= 2000 : false)
-              return (
-                <label key={raw} className={`lamp-item${isDanger ? ' is-danger' : isWarning ? ' is-warn' : ''}`}>
-                  <input type="checkbox" checked={selectedReminderIds.includes(id)} title="Marcar lembrete para exclusão" onChange={(e) => setSelectedReminderIds((prev) => e.target.checked ? [...new Set([...prev, id])] : prev.filter((x) => x !== id))} />
-                  {isDanger ? <Icon name="triangleAlert" size={16} /> : null}
-                  <span>{l}</span>
-                </label>
-              )
-            })}
-          </div>
-        ) : <p className="muted">Sem lembretes por enquanto.</p>}
-        {!!selectedReminderIds.length && (
-          <div style={{ marginTop: 12 }}>
-            <button type="button" className="btn btn-danger btn-sm" onClick={async () => { for (const id of selectedReminderIds) await api.post(`/expenses/${id}/confirm-reminder`); setSelectedReminderIds([]); await load() }}>
-              <Icon name="check" size={16} />Confirmar exclusão dos lembretes
-            </button>
-          </div>
-        )}
       </div>
 
       <div className="card" ref={printAreaRef}>
