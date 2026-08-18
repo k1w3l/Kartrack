@@ -291,7 +291,7 @@ export default function RecordsPage({ vehicleId }) {
           </div>
         </div>
         <div className="cluster cluster-end" style={{ marginTop: 12 }}>
-          <button type="button" className="btn btn-danger btn-sm" onClick={() => deleteRecords(selectedRecords)}>
+          <button type="button" className="btn btn-danger btn-sm" disabled={!selectedRecords.length} onClick={() => deleteRecords(selectedRecords)}>
             <Icon name="trash" size={16} />Excluir selecionados
           </button>
         </div>
@@ -359,7 +359,7 @@ export default function RecordsPage({ vehicleId }) {
 
       <div className="card">
         <h2 className="section-title"><Icon name="sliders" size={16} />Tipos de dados</h2>
-        <p className="muted small" style={{ marginTop: -8 }}>Cada cadastro fica no dropdown do tipo. Selecione um item para excluir.</p>
+        <p className="muted small" style={{ marginTop: -8 }}>Os itens cadastrados ficam no dropdown de cada tipo.</p>
         <div className="grid-3">
           {DATA_TYPE_FIELDS.map((field) => (
             <DataTypeEditor
@@ -394,9 +394,15 @@ function DataTypeEditor({ field, values, onAdd, onRemove }) {
 
   const selectedItem = values.find((item) => String(item.id) === String(selectedId))
 
+  const submitNewValue = async () => {
+    const created = await onAdd(newValue)
+    setNewValue('')
+    if (created?.id) setSelectedId(String(created.id))
+  }
+
   return (
     <div className="records-data-type">
-      <div className="records-data-type-label">{field.label}</div>
+      <div className="records-data-type-label">{field.label} <span className="muted">({values.length})</span></div>
       <div className="records-data-type-list">
         <select
           className="select"
@@ -422,16 +428,19 @@ function DataTypeEditor({ field, values, onAdd, onRemove }) {
         </button>
       </div>
       <div className="inline-add">
-        <input className="input" value={newValue} onChange={(e) => setNewValue(e.target.value)} placeholder={field.placeholder} />
-        <button
-          type="button"
-          className="btn btn-sm btn-accent"
-          onClick={async () => {
-            const created = await onAdd(newValue)
-            setNewValue('')
-            if (created?.id) setSelectedId(String(created.id))
+        <input
+          className="input"
+          value={newValue}
+          onChange={(e) => setNewValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              submitNewValue()
+            }
           }}
-        >
+          placeholder={field.placeholder}
+        />
+        <button type="button" className="btn btn-sm btn-accent" onClick={submitNewValue}>
           Adicionar
         </button>
       </div>
