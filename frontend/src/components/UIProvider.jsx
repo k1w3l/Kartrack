@@ -33,7 +33,12 @@ export function UIProvider({ children }) {
   const notify = useCallback((message, options = {}) => {
     const id = (idRef.current += 1)
     const timeout = options.timeout ?? 4000
-    setToasts((current) => [...current, { id, message, type: options.type || 'info' }])
+    setToasts((current) => [...current, {
+      id,
+      message,
+      type: options.type || 'info',
+      onClick: typeof options.onClick === 'function' ? options.onClick : undefined,
+    }])
     if (timeout) setTimeout(() => dismiss(id), timeout)
     return id
   }, [dismiss])
@@ -102,15 +107,43 @@ export function UIProvider({ children }) {
       {children}
 
       <div className="toast-stack" aria-live="polite" aria-atomic="false">
-        {toasts.map((item) => (
-          <div key={item.id} className={`app-toast app-toast-${item.type}`} role={item.type === 'error' ? 'alert' : 'status'}>
-            <Icon name={TOAST_ICONS[item.type] || TOAST_ICONS.info} className="app-toast-icon" size={18} />
-            <span className="app-toast-message">{item.message}</span>
-            <button type="button" className="app-toast-close" onClick={() => dismiss(item.id)} aria-label="Fechar aviso">
-              <Icon name="x" size={16} />
-            </button>
-          </div>
-        ))}
+        {toasts.map((item) => {
+          const activate = item.onClick
+            ? () => {
+                item.onClick()
+                dismiss(item.id)
+              }
+            : undefined
+          return (
+            <div
+              key={item.id}
+              className={`app-toast app-toast-${item.type}${activate ? ' is-clickable' : ''}`}
+              role={activate ? 'button' : item.type === 'error' ? 'alert' : 'status'}
+              tabIndex={activate ? 0 : undefined}
+              onClick={activate}
+              onKeyDown={activate ? (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  activate()
+                }
+              } : undefined}
+            >
+              <Icon name={TOAST_ICONS[item.type] || TOAST_ICONS.info} className="app-toast-icon" size={18} />
+              <span className="app-toast-message">{item.message}</span>
+              <button
+                type="button"
+                className="app-toast-close"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  dismiss(item.id)
+                }}
+                aria-label="Fechar aviso"
+              >
+                <Icon name="x" size={16} />
+              </button>
+            </div>
+          )
+        })}
       </div>
 
       <Modal

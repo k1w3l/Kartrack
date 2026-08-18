@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import api from '../api'
 import Icon from './Icon'
 import Modal from './Modal'
+import { useUI } from './UIProvider'
+
+let didAnnounceUrgent = false
 
 function parseReminder(raw) {
   const [id, text] = String(raw).split('::')
@@ -13,6 +16,7 @@ function parseReminder(raw) {
 }
 
 export default function RemindersBell({ vehicleId }) {
+  const { toast } = useUI()
   const [lembretes, setLembretes] = useState([])
   const [open, setOpen] = useState(false)
   const [selectedIds, setSelectedIds] = useState([])
@@ -46,8 +50,21 @@ export default function RemindersBell({ vehicleId }) {
   }, [vehicleId, lembretes.length])
 
   const parsed = useMemo(() => lembretes.map(parseReminder), [lembretes])
-  const urgent = parsed.some((item) => item.isDanger)
+  const urgentItems = useMemo(() => parsed.filter((item) => item.isDanger), [parsed])
+  const urgent = urgentItems.length > 0
   const count = parsed.length
+
+  useEffect(() => {
+    if (didAnnounceUrgent || !urgentItems.length) return
+    didAnnounceUrgent = true
+    const message = urgentItems.length === 1
+      ? urgentItems[0].text
+      : `Você tem ${urgentItems.length} lembretes urgentes de manutenção.`
+    toast.error(message, {
+      timeout: 6000,
+      onClick: () => setOpen(true),
+    })
+  }, [urgentItems, toast])
 
   if (!vehicleId) return null
 

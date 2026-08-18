@@ -463,6 +463,14 @@ label.btn {
   padding: 0;
 }
 
+.app-toast.is-clickable {
+  cursor: pointer;
+}
+
+.app-toast.is-clickable:hover {
+  background: var(--panel-2);
+}
+
 .app-toast-success { border-left-color: var(--ok); color: var(--text); }
 .app-toast-success .app-toast-icon { color: var(--ok); }
 .app-toast-error { border-left-color: var(--danger); }
