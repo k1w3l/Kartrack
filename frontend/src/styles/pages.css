@@ -371,6 +371,74 @@
   .records-summary { grid-template-columns: repeat(4, 1fr); }
 }
 
+.records-bulk-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.records-bulk-form .field {
+  flex: 1 1 14rem;
+  min-width: min(100%, 12rem);
+}
+
+.records-bulk-apply {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-end;
+}
+
+.records-bulk-apply .btn {
+  width: auto;
+  white-space: nowrap;
+}
+
+.records-pager {
+  margin-top: var(--space-3);
+}
+
+.records-data-type {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel-2);
+  min-width: 0;
+}
+
+.records-data-type-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.records-data-type-list {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.records-data-type-list .select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.records-data-type .inline-add {
+  margin-top: 0;
+}
+
+@media (max-width: 575.98px) {
+  .records-bulk-apply {
+    flex: 1 1 100%;
+  }
+
+  .records-bulk-apply .btn {
+    width: 100%;
+  }
+}
+
 .chart-box {
   height: 300px;
 }

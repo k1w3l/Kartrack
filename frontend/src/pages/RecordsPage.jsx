@@ -46,6 +46,8 @@ const DATA_TYPE_FIELDS = [
   { key: 'expense_imposto_tipo', label: 'Tipos de imposto', placeholder: 'Ex.: Taxa administrativa' },
 ]
 
+const RECORDS_PAGE_SIZE = 10
+
 export default function RecordsPage({ vehicleId }) {
   const navigate = useNavigate()
   const { confirm, toast } = useUI()
@@ -57,6 +59,7 @@ export default function RecordsPage({ vehicleId }) {
   const [dataTypes, setDataTypes] = useState({})
   const [loadError, setLoadError] = useState('')
   const [selectedIds, setSelectedIds] = useState([])
+  const [page, setPage] = useState(1)
 
   const loadTimeline = async () => {
     if (!vehicleId) return
@@ -86,7 +89,22 @@ export default function RecordsPage({ vehicleId }) {
     if (bulkFilter === 'todos') return timeline
     return timeline.filter((r) => r.tipo_registro === bulkFilter)
   }, [timeline, bulkFilter])
-  const displayedRecords = useMemo(() => filteredRecords, [filteredRecords])
+
+  const totalPages = Math.max(1, Math.ceil(filteredRecords.length / RECORDS_PAGE_SIZE))
+  const displayedRecords = useMemo(() => {
+    const start = (page - 1) * RECORDS_PAGE_SIZE
+    return filteredRecords.slice(start, start + RECORDS_PAGE_SIZE)
+  }, [filteredRecords, page])
+  const pageStart = filteredRecords.length ? (page - 1) * RECORDS_PAGE_SIZE + 1 : 0
+  const pageEnd = Math.min(page * RECORDS_PAGE_SIZE, filteredRecords.length)
+
+  useEffect(() => {
+    setPage(1)
+  }, [bulkFilter, vehicleId])
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [page, totalPages])
 
   const selectedRecords = useMemo(
     () => filteredRecords.filter((record) => selectedIds.includes(`${record.tipo_registro}:${record.id}`)),
@@ -147,7 +165,16 @@ export default function RecordsPage({ vehicleId }) {
 
   const deleteRecords = async (records) => {
     if (!records.length) return
-    const ok = await confirm({ title: 'Excluir registros', message: `Deseja excluir ${records.length} registro(s)?`, confirmLabel: 'Excluir', danger: true })
+    const count = records.length
+    const single = count === 1 ? records[0] : null
+    const ok = await confirm({
+      title: count === 1 ? 'Excluir registro' : 'Excluir registros',
+      message: single
+        ? `Excluir o registro ${single.tipo_registro} #${single.id}? Esta ação não pode ser desfeita.`
+        : `Excluir ${count} registros selecionados? Esta ação não pode ser desfeita.`,
+      confirmLabel: 'Excluir',
+      danger: true,
+    })
     if (!ok) return
     for (const record of records) {
       if (record.tipo_registro === 'abastecimento') await api.delete(`/fuel/${record.id}`)
@@ -186,20 +213,30 @@ export default function RecordsPage({ vehicleId }) {
 
   const addDataTypeValue = async (key, value) => {
     const trimmed = String(value || '').trim()
-    if (!trimmed) return
+    if (!trimmed) return null
     try {
       const { data } = await api.post('/lookup', { category: key, value: trimmed })
       setDataTypes((prev) => ({ ...prev, [key]: [...(prev[key] || []), data] }))
+      return data
     } catch {
       toast.error('Item já cadastrado.')
+      return null
     }
   }
 
-  const removeDataTypeValue = async (key, item) => {
+  const removeDataTypeValue = async (key, item, label) => {
     if (!item?.id) return
+    const ok = await confirm({
+      title: 'Excluir cadastro',
+      message: `Excluir "${item.value}" de ${label}? Esta ação não pode ser desfeita.`,
+      confirmLabel: 'Excluir',
+      danger: true,
+    })
+    if (!ok) return
     await api.delete(`/lookup/${item.id}`)
     const next = (dataTypes[key] || []).filter((v) => v.id !== item.id)
     setDataTypes((prev) => ({ ...prev, [key]: next }))
+    toast.success('Cadastro excluído.')
   }
 
   if (!vehicleId) {
@@ -219,7 +256,7 @@ export default function RecordsPage({ vehicleId }) {
 
       <div className="card">
         <h2 className="section-title"><Icon name="layers" size={16} />Edição em massa</h2>
-        <div className="grid-2">
+        <div className="records-bulk-form">
           <div className="field">
             <label className="field-label">Filtro de tipo</label>
             <select className="select" value={bulkFilter} onChange={(e) => setBulkFilter(e.target.value)}>
@@ -247,8 +284,8 @@ export default function RecordsPage({ vehicleId }) {
             <label className="field-label">Novo valor</label>
             <BulkValueInput field={bulkFieldConfig} value={bulkValue} onChange={setBulkValue} />
           </div>
-          <div className="field">
-            <button type="button" className="btn btn-primary w-full" onClick={applyBulkEdit} disabled={applyingBulk}>
+          <div className="records-bulk-apply">
+            <button type="button" className="btn btn-primary" onClick={applyBulkEdit} disabled={applyingBulk || bulkValue === ''}>
               {applyingBulk ? <><ButtonSpinner />Aplicando...</> : <><Icon name="wand" size={16} />Aplicar</>}
             </button>
           </div>
@@ -263,11 +300,14 @@ export default function RecordsPage({ vehicleId }) {
 
       <div className="card">
         <h2 className="section-title"><Icon name="squarePen" size={16} />Editar registros</h2>
+        {filteredRecords.length > RECORDS_PAGE_SIZE && (
+          <p className="muted small">Mostrando {pageStart}–{pageEnd} de {filteredRecords.length} registros</p>
+        )}
         <div className="table-wrap">
           <table className="table">
             <thead>
               <tr>
-                <th><input type="checkbox" checked={!!displayedRecords.length && displayedRecords.every((record) => selectedIds.includes(`${record.tipo_registro}:${record.id}`))} onChange={toggleSelectAll} /></th>
+                <th><input type="checkbox" aria-label="Selecionar registros desta página" checked={!!displayedRecords.length && displayedRecords.every((record) => selectedIds.includes(`${record.tipo_registro}:${record.id}`))} onChange={toggleSelectAll} /></th>
                 <th>Registro</th>
                 <th>Data</th>
                 <th>Km</th>
@@ -306,10 +346,20 @@ export default function RecordsPage({ vehicleId }) {
             </tbody>
           </table>
         </div>
+        {filteredRecords.length > RECORDS_PAGE_SIZE && (
+          <div className="cluster cluster-spread records-pager">
+            <p className="muted small">Página {page} de {totalPages}</p>
+            <div className="cluster">
+              <button type="button" className="btn btn-ghost btn-sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Anterior</button>
+              <button type="button" className="btn btn-ghost btn-sm" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>Próxima</button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="card">
         <h2 className="section-title"><Icon name="sliders" size={16} />Tipos de dados</h2>
+        <p className="muted small" style={{ marginTop: -8 }}>Cada cadastro fica no dropdown do tipo. Selecione um item para excluir.</p>
         <div className="grid-3">
           {DATA_TYPE_FIELDS.map((field) => (
             <DataTypeEditor
@@ -317,7 +367,7 @@ export default function RecordsPage({ vehicleId }) {
               field={field}
               values={dataTypes[field.key] || []}
               onAdd={(v) => addDataTypeValue(field.key, v)}
-              onRemove={(v) => removeDataTypeValue(field.key, v)}
+              onRemove={(item) => removeDataTypeValue(field.key, item, field.label)}
             />
           ))}
         </div>
@@ -334,24 +384,56 @@ export default function RecordsPage({ vehicleId }) {
 
 function DataTypeEditor({ field, values, onAdd, onRemove }) {
   const [newValue, setNewValue] = useState('')
+  const [selectedId, setSelectedId] = useState('')
+
+  useEffect(() => {
+    if (!values.some((item) => String(item.id) === String(selectedId))) {
+      setSelectedId(values[0] ? String(values[0].id) : '')
+    }
+  }, [values, selectedId])
+
+  const selectedItem = values.find((item) => String(item.id) === String(selectedId))
 
   return (
-    <div className="card">
-      <div className="section-title">{field.label}</div>
+    <div className="records-data-type">
+      <div className="records-data-type-label">{field.label}</div>
+      <div className="records-data-type-list">
+        <select
+          className="select"
+          value={selectedId}
+          onChange={(e) => setSelectedId(e.target.value)}
+          disabled={!values.length}
+          aria-label={`Itens cadastrados em ${field.label}`}
+        >
+          {!values.length && <option value="">Nenhum item cadastrado</option>}
+          {values.map((item) => (
+            <option key={item.id || item.value} value={item.id}>{item.value}</option>
+          ))}
+        </select>
+        <button
+          type="button"
+          className="btn btn-sm btn-danger"
+          disabled={!selectedItem}
+          onClick={() => onRemove(selectedItem)}
+          title="Excluir item selecionado"
+          aria-label={`Excluir ${selectedItem?.value || 'item'}`}
+        >
+          <Icon name="trash" size={16} />
+        </button>
+      </div>
       <div className="inline-add">
         <input className="input" value={newValue} onChange={(e) => setNewValue(e.target.value)} placeholder={field.placeholder} />
-        <button type="button" className="btn btn-sm btn-accent" onClick={() => { onAdd(newValue); setNewValue('') }}>Adicionar</button>
-      </div>
-      <div className="cluster" style={{ marginTop: 8 }}>
-        {values.map((item) => (
-          <span key={item.id || item.value} className="chip">
-            {item.value}
-            <button type="button" className="chip-btn" onClick={() => onRemove(item)} title="Remover" aria-label="Remover">
-              <Icon name="x" size={14} />
-            </button>
-          </span>
-        ))}
-        {!values.length && <span className="muted small">Nenhum item cadastrado.</span>}
+        <button
+          type="button"
+          className="btn btn-sm btn-accent"
+          onClick={async () => {
+            const created = await onAdd(newValue)
+            setNewValue('')
+            if (created?.id) setSelectedId(String(created.id))
+          }}
+        >
+          Adicionar
+        </button>
       </div>
     </div>
   )
