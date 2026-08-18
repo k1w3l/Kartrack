@@ -2,6 +2,8 @@ import { useState } from 'react'
 import api, { API_BASE_URL } from '../api'
 import Modal from '../components/Modal'
 import { useUI } from '../components/UIProvider'
+import Icon from '../components/Icon'
+import { ButtonSpinner } from '../components/Loading'
 
 const BACKUP_KEYS = [
   'cartrack_vehicle_meta', 'cartrack_combustiveis', 'cartrack_bandeiras', 'cartrack_postos',
@@ -80,49 +82,49 @@ export default function BackupRestorePage({ vehicleId }) {
   }
 
   return (
-    <div className="card card-body">
-      <h4><i className="fa-solid fa-arrows-rotate me-2" />Backup/Restore</h4>
+    <div className="stack-lg">
+      <h1 className="page-title"><Icon name="refresh" />Backup/Restore</h1>
 
-      <div className="row g-3 mt-1">
-        <div className="col-lg-6">
-          <div className="card card-body h-100">
-            <h6><i className="fa-solid fa-file-import me-2" />Importação</h6>
-            <div className="d-flex flex-column gap-2 mt-2">
-              <label className="btn btn-outline-primary text-start"><i className="fa-solid fa-gas-pump me-2" />Importar abastecimentos<input type="file" className="d-none" accept=".csv" onChange={(e) => importCsv('abastecimentos', e.target.files?.[0])} /></label>
-              <label className="btn btn-outline-primary text-start"><i className="fa-solid fa-receipt me-2" />Importar despesas<input type="file" className="d-none" accept=".csv" onChange={(e) => importCsv('despesas', e.target.files?.[0])} /></label>
-              <label className="btn btn-outline-primary text-start"><i className="fa-solid fa-box-archive me-2" />Importar todos os registros<input type="file" className="d-none" accept=".csv" onChange={(e) => importCsv('todos', e.target.files?.[0])} /></label>
+      <div className="grid-2">
+        <div>
+          <div className="card">
+            <h2 className="section-title"><Icon name="fileInput" size={16} />Importação</h2>
+            <div className="stack">
+              <label className="btn btn-accent"><Icon name="fuel" size={16} />Importar abastecimentos<input type="file" className="file-hidden" accept=".csv" onChange={(e) => importCsv('abastecimentos', e.target.files?.[0])} /></label>
+              <label className="btn btn-accent"><Icon name="receipt" size={16} />Importar despesas<input type="file" className="file-hidden" accept=".csv" onChange={(e) => importCsv('despesas', e.target.files?.[0])} /></label>
+              <label className="btn btn-accent"><Icon name="archive" size={16} />Importar todos os registros<input type="file" className="file-hidden" accept=".csv" onChange={(e) => importCsv('todos', e.target.files?.[0])} /></label>
             </div>
           </div>
         </div>
 
-        <div className="col-lg-6">
-          <div className="card card-body h-100">
-            <h6><i className="fa-solid fa-file-export me-2" />Exportação</h6>
-            <div className="d-flex flex-column gap-2 mt-2">
-              <a className="btn btn-outline-success text-start" href={`${API_BASE_URL}/records/export?vehicle_id=${vehicleId}&mode=abastecimentos`} target="_blank" rel="noreferrer"><i className="fa-solid fa-gas-pump me-2" />Exportar abastecimentos</a>
-              <a className="btn btn-outline-success text-start" href={`${API_BASE_URL}/records/export?vehicle_id=${vehicleId}&mode=despesas`} target="_blank" rel="noreferrer"><i className="fa-solid fa-receipt me-2" />Exportar despesas</a>
-              <a className="btn btn-outline-success text-start" href={`${API_BASE_URL}/records/export?vehicle_id=${vehicleId}&mode=todos`} target="_blank" rel="noreferrer"><i className="fa-solid fa-box-archive me-2" />Exportar todos os registros</a>
+        <div>
+          <div className="card">
+            <h2 className="section-title"><Icon name="fileOutput" size={16} />Exportação</h2>
+            <div className="stack">
+              <a className="btn btn-ok" href={`${API_BASE_URL}/records/export?vehicle_id=${vehicleId}&mode=abastecimentos`} target="_blank" rel="noreferrer"><Icon name="fuel" size={16} />Exportar abastecimentos</a>
+              <a className="btn btn-ok" href={`${API_BASE_URL}/records/export?vehicle_id=${vehicleId}&mode=despesas`} target="_blank" rel="noreferrer"><Icon name="receipt" size={16} />Exportar despesas</a>
+              <a className="btn btn-ok" href={`${API_BASE_URL}/records/export?vehicle_id=${vehicleId}&mode=todos`} target="_blank" rel="noreferrer"><Icon name="archive" size={16} />Exportar todos os registros</a>
             </div>
           </div>
         </div>
 
-        <div className="col-12">
-          <div className="card card-body">
-            <h6><i className="fa-solid fa-file-csv me-2" />Modelos de importação</h6>
-            <div className="d-flex flex-wrap gap-2 mt-2">
-              <a className="btn btn-outline-secondary" href={`${API_BASE_URL}/records/template?mode=abastecimentos`} target="_blank" rel="noreferrer">Modelo abastecimentos</a>
-              <a className="btn btn-outline-secondary" href={`${API_BASE_URL}/records/template?mode=despesas`} target="_blank" rel="noreferrer">Modelo despesas</a>
-              <a className="btn btn-outline-secondary" href={`${API_BASE_URL}/records/template?mode=todos`} target="_blank" rel="noreferrer">Modelo completo</a>
+        <div className="span-2">
+          <div className="card">
+            <h2 className="section-title"><Icon name="fileSpreadsheet" size={16} />Modelos de importação</h2>
+            <div className="cluster">
+              <a className="btn btn-ghost" href={`${API_BASE_URL}/records/template?mode=abastecimentos`} target="_blank" rel="noreferrer">Modelo abastecimentos</a>
+              <a className="btn btn-ghost" href={`${API_BASE_URL}/records/template?mode=despesas`} target="_blank" rel="noreferrer">Modelo despesas</a>
+              <a className="btn btn-ghost" href={`${API_BASE_URL}/records/template?mode=todos`} target="_blank" rel="noreferrer">Modelo completo</a>
             </div>
           </div>
         </div>
 
-        <div className="col-12">
-          <div className="card card-body">
-            <h4><i className="fa-solid fa-server me-2" />Sistema</h4>
-            <div className="d-flex flex-wrap gap-2 mt-2">
-              <button type="button" className="btn btn-outline-dark" onClick={backupSystem}><i className="fa-solid fa-floppy-disk me-2" />Backup do sistema</button>
-              <label className="btn btn-outline-dark mb-0"><i className="fa-solid fa-arrows-rotate me-2" />Restore do sistema<input type="file" className="d-none" accept="application/json,.json" onChange={(e) => restoreSystem(e.target.files?.[0])} /></label>
+        <div className="span-2">
+          <div className="card">
+            <h2 className="section-title"><Icon name="server" size={16} />Sistema</h2>
+            <div className="cluster">
+              <button type="button" className="btn btn-ghost" onClick={backupSystem}><Icon name="save" size={16} />Backup do sistema</button>
+              <label className="btn btn-ghost"><Icon name="refresh" size={16} />Restore do sistema<input type="file" className="file-hidden" accept="application/json,.json" onChange={(e) => restoreSystem(e.target.files?.[0])} /></label>
             </div>
           </div>
         </div>
@@ -132,10 +134,10 @@ export default function BackupRestorePage({ vehicleId }) {
         open={Boolean(preview)}
         onClose={() => { if (!confirming) setPreview(null) }}
         title={preview?.title}
-        titleIcon="fa-solid fa-clipboard-check"
+        titleIcon="clipboardCheck"
         footer={(
           <>
-            <button type="button" className="btn btn-outline-secondary" disabled={confirming} onClick={() => setPreview(null)}>Cancelar</button>
+            <button type="button" className="btn btn-ghost" disabled={confirming} onClick={() => setPreview(null)}>Cancelar</button>
             <button
               type="button"
               className="btn btn-primary"
@@ -152,12 +154,12 @@ export default function BackupRestorePage({ vehicleId }) {
                 }
               }}
             >
-              {confirming ? <><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />Processando...</> : 'Confirmar'}
+              {confirming ? <><ButtonSpinner />Processando...</> : 'Confirmar'}
             </button>
           </>
         )}
       >
-        {preview && <ul className="mb-0">{preview.rows.map((r) => <li key={r}>{r}</li>)}</ul>}
+        {preview && <ul>{preview.rows.map((r) => <li key={r}>{r}</li>)}</ul>}
       </Modal>
     </div>
   )

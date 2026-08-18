@@ -1,0 +1,83 @@
+:root {
+  --font-ui: "Chivo", system-ui, sans-serif;
+  --font-mono: "Chivo Mono", ui-monospace, monospace;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.35rem;
+  --text-kpi: clamp(1.35rem, 2.4vw, 1.85rem);
+
+  --header-h: 56px;
+  --rail-w: 232px;
+  --rail-w-collapsed: 72px;
+  --bottom-nav-h: 64px;
+
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur: 180ms;
+  --dur-slow: 280ms;
+
+  --z-sticky: 10;
+  --z-dropdown: 30;
+  --z-bottom: 40;
+  --z-overlay: 1000;
+  --z-modal: 1010;
+  --z-toast: 1100;
+
+  /* Superfícies: cinza neutro de produção. Violeta só em acento/detalhe. */
+  --bg: #16181c;
+  --panel: #202329;
+  --panel-2: #26292f;
+  --text: #e7e8ea;
+  --muted: #9aa1ab;
+  --border: #353941;
+  --accent: #9184d9;
+  --accent-dim: rgba(145, 132, 217, 0.16);
+  --accent-glow: rgba(181, 171, 252, 0.38);
+  --on-accent: #16181c;
+  --ok: #3ddc97;
+  --ok-dim: rgba(61, 220, 151, 0.14);
+  --danger: #e24b4a;
+  --danger-dim: rgba(226, 75, 74, 0.16);
+  --warning: #e0a14a;
+  --tick: rgba(181, 171, 252, 0.22);
+  --skeleton-base: #2a2e35;
+  --skeleton-highlight: #353a43;
+  --overlay: rgba(10, 12, 14, 0.62);
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.32);
+}
+
+.theme-light {
+  --bg: #f1f3f5;
+  --panel: #ffffff;
+  --panel-2: #f8fafc;
+  --text: #0f172a;
+  --muted: #5b6470;
+  --border: #dbe2ee;
+  --accent: #796cbf;
+  --accent-dim: rgba(121, 108, 191, 0.12);
+  --accent-glow: rgba(121, 108, 191, 0.28);
+  --on-accent: #ffffff;
+  --ok: #1a8a58;
+  --ok-dim: rgba(26, 138, 88, 0.12);
+  --danger: #c43332;
+  --danger-dim: rgba(196, 51, 50, 0.12);
+  --warning: #b56f08;
+  --tick: rgba(121, 108, 191, 0.22);
+  --skeleton-base: #e3e7ec;
+  --skeleton-highlight: #f8fafc;
+  --overlay: rgba(15, 23, 42, 0.45);
+  --shadow: 0 10px 28px rgba(15, 23, 42, 0.1);
+}

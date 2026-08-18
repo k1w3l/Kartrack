@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import api from '../api'
 import { useUI } from '../components/UIProvider'
+import Icon from '../components/Icon'
 
 const defaultNewUser = { name: '', email: '', password: '' }
 
@@ -59,40 +60,40 @@ export default function SettingsPage({ user, onUserUpdated }) {
   }
 
   const resetPassword = async (userId) => {
-    const next = await prompt({ title: 'Redefinir senha', label: 'Nova senha', inputType: 'password', minLength: 6, titleIcon: 'fa-solid fa-key', confirmLabel: 'Redefinir' })
+    const next = await prompt({ title: 'Redefinir senha', label: 'Nova senha', inputType: 'password', minLength: 6, titleIcon: 'key', confirmLabel: 'Redefinir' })
     if (!next) return
     await api.post(`/users/${userId}/reset-password`, { new_password: next })
     toast.success('Senha redefinida com sucesso.')
   }
 
   return (
-    <div className="d-flex flex-column gap-3">
-      <div className="card card-body">
-        <h4><i className="fa-solid fa-gear me-2" />Configurações</h4>
+    <div className="stack-lg">
+      <div className="card">
+        <h1 className="page-title"><Icon name="settings" />Configurações</h1>
       </div>
 
       {user?.is_admin && (
-        <div className="card card-body">
-          <h5><i className="fa-solid fa-users-gear me-2" />Gestão de usuários</h5>
+        <div className="card">
+          <h2 className="section-title"><Icon name="users" size={16} />Gestão de usuários</h2>
 
-          <div className="row g-2 mt-1 align-items-end">
-            <div className="col-md-4">
-              <label className="form-label" htmlFor="new-user-name">Nome</label>
-              <input id="new-user-name" className="form-control" placeholder="Nome" autoComplete="off" value={newUser.name} onChange={(e) => setNewUser((p) => ({ ...p, name: e.target.value }))} />
+          <div className="grid-2">
+            <div className="field">
+              <label className="field-label" htmlFor="new-user-name">Nome</label>
+              <input id="new-user-name" className="input" placeholder="Nome" autoComplete="off" value={newUser.name} onChange={(e) => setNewUser((p) => ({ ...p, name: e.target.value }))} />
             </div>
-            <div className="col-md-4">
-              <label className="form-label" htmlFor="new-user-email">E-mail</label>
-              <input id="new-user-email" className="form-control" placeholder="E-mail" type="email" inputMode="email" autoComplete="off" value={newUser.email} onChange={(e) => setNewUser((p) => ({ ...p, email: e.target.value }))} />
+            <div className="field">
+              <label className="field-label" htmlFor="new-user-email">E-mail</label>
+              <input id="new-user-email" className="input" placeholder="E-mail" type="email" inputMode="email" autoComplete="off" value={newUser.email} onChange={(e) => setNewUser((p) => ({ ...p, email: e.target.value }))} />
             </div>
-            <div className="col-md-3">
-              <label className="form-label" htmlFor="new-user-password">Senha</label>
-              <input id="new-user-password" className="form-control" placeholder="Senha" type="password" autoComplete="new-password" value={newUser.password} onChange={(e) => setNewUser((p) => ({ ...p, password: e.target.value }))} />
+            <div className="field">
+              <label className="field-label" htmlFor="new-user-password">Senha</label>
+              <input id="new-user-password" className="input" placeholder="Senha" type="password" autoComplete="new-password" value={newUser.password} onChange={(e) => setNewUser((p) => ({ ...p, password: e.target.value }))} />
             </div>
-            <div className="col-md-1"><button type="button" className="btn btn-primary w-100" onClick={createUser} aria-label="Adicionar usuário"><i className="fa-solid fa-plus" /></button></div>
+            <div className="field"><button type="button" className="btn btn-primary w-full" onClick={createUser} aria-label="Adicionar usuário"><Icon name="plus" /></button></div>
           </div>
 
-          <div className="table-responsive mt-3">
-            <table className="table table-sm align-middle">
+          <div className="table-wrap">
+            <table className="table">
               <thead><tr><th>Nome</th><th>E-mail</th><th>Admin</th><th>Ações</th></tr></thead>
               <tbody>
                 {users.map((u) => (
@@ -100,46 +101,46 @@ export default function SettingsPage({ user, onUserUpdated }) {
                     <td>{u.name}</td>
                     <td>{u.email}</td>
                     <td>{u.is_admin ? 'Sim' : 'Não'}</td>
-                    <td className="d-flex gap-2">
-                      <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => resetPassword(u.id)}><i className="fa-solid fa-key me-1" />Senha</button>
-                      {!u.is_admin && <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => deleteUser(u.id)}><i className="fa-solid fa-trash me-1" />Excluir</button>}
+                    <td className="cluster">
+                      <button type="button" className="btn btn-sm btn-ghost" onClick={() => resetPassword(u.id)}><Icon name="key" size={14} />Senha</button>
+                      {!u.is_admin && <button type="button" className="btn btn-sm btn-danger" onClick={() => deleteUser(u.id)}><Icon name="trash" size={14} />Excluir</button>}
                     </td>
                   </tr>
                 ))}
-                {!users.length && <tr><td colSpan={4} className="text-muted">Nenhum usuário disponível.</td></tr>}
+                {!users.length && <tr><td colSpan={4} className="muted">Nenhum usuário disponível.</td></tr>}
               </tbody>
             </table>
           </div>
         </div>
       )}
 
-      <div className="card card-body">
-        <h5><i className="fa-solid fa-language me-2" />Idioma, unidades e moeda</h5>
-        <div className="row g-2 mt-1">
-          <div className="col-md-4">
-            <label className="form-label">Idioma</label>
-            <select className="form-select" value={preferences.language} onChange={(e) => setPreferences((p) => ({ ...p, language: e.target.value }))}>
+      <div className="card">
+        <h2 className="section-title"><Icon name="languages" size={16} />Idioma, unidades e moeda</h2>
+        <div className="grid-2">
+          <div className="field">
+            <label className="field-label">Idioma</label>
+            <select className="select" value={preferences.language} onChange={(e) => setPreferences((p) => ({ ...p, language: e.target.value }))}>
               <option value="pt-BR">Português (Brasil)</option>
               <option value="en-US">English (US)</option>
             </select>
           </div>
-          <div className="col-md-4">
-            <label className="form-label">Unidades</label>
-            <select className="form-select" value={preferences.unit_system} onChange={(e) => setPreferences((p) => ({ ...p, unit_system: e.target.value }))}>
+          <div className="field">
+            <label className="field-label">Unidades</label>
+            <select className="select" value={preferences.unit_system} onChange={(e) => setPreferences((p) => ({ ...p, unit_system: e.target.value }))}>
               <option value="metric">Métrico (km, L)</option>
               <option value="imperial">Imperial (mi, gal)</option>
             </select>
           </div>
-          <div className="col-md-4">
-            <label className="form-label">Moeda</label>
-            <select className="form-select" value={preferences.currency} onChange={(e) => setPreferences((p) => ({ ...p, currency: e.target.value }))}>
+          <div className="field">
+            <label className="field-label">Moeda</label>
+            <select className="select" value={preferences.currency} onChange={(e) => setPreferences((p) => ({ ...p, currency: e.target.value }))}>
               <option value="BRL">Real (BRL)</option>
               <option value="USD">Dollar (USD)</option>
             </select>
           </div>
         </div>
-        <div className="mt-3 d-flex justify-content-end">
-          <button type="button" className="btn btn-primary" onClick={savePreferences}><i className="fa-solid fa-floppy-disk me-2" />Salvar preferências</button>
+        <div className="form-actions cluster-end">
+          <button type="button" className="btn btn-primary" onClick={savePreferences}><Icon name="save" size={16} />Salvar preferências</button>
         </div>
       </div>
     </div>

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api'
 import { useUI } from '../components/UIProvider'
+import Icon from '../components/Icon'
+import { ButtonSpinner } from '../components/Loading'
 
 const COMMON_BULK_FIELDS = [
   { value: 'data', label: 'Data', input: 'date', apiField: 'data' },
@@ -205,138 +207,126 @@ export default function RecordsPage({ vehicleId }) {
   }
 
   return (
-    <div className="card card-body">
-      <h4><i className="fa-solid fa-folder-open me-2" />Registros</h4>
+    <div className="stack-lg">
+      <h1 className="page-title"><Icon name="folderOpen" />Registros</h1>
 
-      <div className="row g-3 mt-1">
-        <div className="col-12">
-          <div className="row g-3 records-summary-row">
-            <SummaryCard icon="fa-solid fa-list" label="Total visível" value={filteredRecords.length} />
-            <SummaryCard icon="fa-solid fa-check-double" label="Selecionados" value={selectedRecords.length} />
-            <SummaryCard icon="fa-solid fa-gas-pump" label="Abastecimentos" value={filteredRecords.filter((record) => record.tipo_registro === 'abastecimento').length} />
-            <SummaryCard icon="fa-solid fa-receipt" label="Despesas" value={filteredRecords.filter((record) => record.tipo_registro !== 'abastecimento').length} />
+      <div className="records-summary">
+        <SummaryCard icon="list" label="Total visível" value={filteredRecords.length} />
+        <SummaryCard icon="checkCheck" label="Selecionados" value={selectedRecords.length} />
+        <SummaryCard icon="fuel" label="Abastecimentos" value={filteredRecords.filter((record) => record.tipo_registro === 'abastecimento').length} />
+        <SummaryCard icon="receipt" label="Despesas" value={filteredRecords.filter((record) => record.tipo_registro !== 'abastecimento').length} />
+      </div>
+
+      <div className="card">
+        <h2 className="section-title"><Icon name="layers" size={16} />Edição em massa</h2>
+        <div className="grid-2">
+          <div className="field">
+            <label className="field-label">Filtro de tipo</label>
+            <select className="select" value={bulkFilter} onChange={(e) => setBulkFilter(e.target.value)}>
+              <option value="todos">Todos</option>
+              <option value="abastecimento">Abastecimento</option>
+              <option value="manutenção">Manutenção</option>
+              <option value="multa">Multa</option>
+              <option value="financiamento">Financiamento</option>
+              <option value="impostos">Impostos</option>
+              <option value="seguro">Seguro</option>
+              <option value="acessórios">Acessórios</option>
+              <option value="estacionamento">Estacionamento</option>
+              <option value="estética">Estética</option>
+              <option value="pedágio">Pedágio</option>
+              <option value="km inicial">KM inicial</option>
+            </select>
+          </div>
+          <div className="field">
+            <label className="field-label">Campo</label>
+            <select className="select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
+              {bulkFieldOptions.map((field) => <option key={field.value} value={field.value}>{field.label}</option>)}
+            </select>
+          </div>
+          <div className="field">
+            <label className="field-label">Novo valor</label>
+            <BulkValueInput field={bulkFieldConfig} value={bulkValue} onChange={setBulkValue} />
+          </div>
+          <div className="field">
+            <button type="button" className="btn btn-primary w-full" onClick={applyBulkEdit} disabled={applyingBulk}>
+              {applyingBulk ? <><ButtonSpinner />Aplicando...</> : <><Icon name="wand" size={16} />Aplicar</>}
+            </button>
           </div>
         </div>
-
-        <div className="col-12">
-          <div className="card card-body records-panel">
-            <h6><i className="fa-solid fa-layer-group me-2" />Edição em massa</h6>
-            <div className="row g-2 mt-1">
-              <div className="col-md-3">
-                <label className="form-label">Filtro de tipo</label>
-                <select className="form-select" value={bulkFilter} onChange={(e) => setBulkFilter(e.target.value)}>
-                  <option value="todos">Todos</option>
-                  <option value="abastecimento">Abastecimento</option>
-                  <option value="manutenção">Manutenção</option>
-                  <option value="multa">Multa</option>
-                  <option value="financiamento">Financiamento</option>
-                  <option value="impostos">Impostos</option>
-                  <option value="seguro">Seguro</option>
-                  <option value="acessórios">Acessórios</option>
-                  <option value="estacionamento">Estacionamento</option>
-                  <option value="estética">Estética</option>
-                  <option value="pedágio">Pedágio</option>
-                  <option value="km inicial">KM inicial</option>
-                </select>
-              </div>
-              <div className="col-md-3">
-                <label className="form-label">Campo</label>
-                <select className="form-select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
-                  {bulkFieldOptions.map((field) => <option key={field.value} value={field.value}>{field.label}</option>)}
-                </select>
-              </div>
-              <div className="col-md-4">
-                <label className="form-label">Novo valor</label>
-                <BulkValueInput
-                  field={bulkFieldConfig}
-                  value={bulkValue}
-                  onChange={setBulkValue}
-                />
-              </div>
-              <div className="col-md-2 d-flex align-items-end">
-                <button type="button" className="btn btn-primary w-100" onClick={applyBulkEdit} disabled={applyingBulk}>
-                  {applyingBulk ? <><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />Aplicando...</> : <><i className="fa-solid fa-wand-magic-sparkles me-2" />Aplicar</>}
-                </button>
-              </div>
-            </div>
-            <div className="d-flex justify-content-end mt-2">
-              <button type="button" className="btn btn-outline-danger btn-sm" onClick={() => deleteRecords(selectedRecords)}>
-                <i className="fa-solid fa-trash me-2" />Excluir selecionados
-              </button>
-            </div>
-            {loadError ? <small className="text-danger mt-2">{loadError}</small> : <small className="text-muted mt-2">{isMixedTarget ? 'Para editar qualquer campo específico, filtre ou selecione registros de um único tipo.' : 'Você pode editar em massa qualquer campo disponível para o tipo selecionado.'}</small>}
-          </div>
-        </div>
-
-        <div className="col-12">
-          <div className="card card-body records-panel">
-            <h6><i className="fa-solid fa-pen-to-square me-2" />Editar registros</h6>
-            <div className="table-responsive mt-2">
-              <table className="table table-sm align-middle records-table">
-                <thead>
-                  <tr>
-                    <th><input type="checkbox" checked={!!displayedRecords.length && displayedRecords.every((record) => selectedIds.includes(`${record.tipo_registro}:${record.id}`))} onChange={toggleSelectAll} /></th>
-                    <th>Registro</th>
-                    <th>Data</th>
-                    <th>Km</th>
-                    <th>Valor</th>
-                    <th>Descrição</th>
-                    <th className="text-end">Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {displayedRecords.map((record) => (
-                    <tr key={`${record.tipo_registro}-${record.id}`} className="records-row">
-                      <td><input type="checkbox" checked={selectedIds.includes(`${record.tipo_registro}:${record.id}`)} onChange={() => toggleSelected(record)} /></td>
-                      <td>
-                        <div className="d-flex flex-column gap-1">
-                          <span className={`badge rounded-pill ${record.tipo_registro === 'abastecimento' ? 'text-bg-primary' : 'text-bg-secondary'} records-type-badge`}>{record.tipo_registro}</span>
-                          <small className="text-muted">ID #{record.id}</small>
-                        </div>
-                      </td>
-                      <td>{record.data}</td>
-                      <td>{record.quilometragem ? `${Number(record.quilometragem).toFixed(0)} km` : '-'}</td>
-                      <td>R$ {Number(record.valor || 0).toFixed(2)}</td>
-                      <td className="records-description-cell">{record.descricao || '-'}</td>
-                      <td className="text-end">
-                        <button type="button" className="btn btn-sm btn-outline-primary me-2" onClick={() => navigate(record.tipo_registro === 'abastecimento' ? `/abastecimento?edit=${record.id}` : `/despesa?edit=${record.id}`)}>
-                          <i className="fa-solid fa-pen me-1" />Editar
-                        </button>
-                        <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => deleteRecords([record])}>
-                          <i className="fa-solid fa-trash me-1" />Excluir
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                  {!filteredRecords.length && <tr><td colSpan={7} className="text-muted">Nenhum registro encontrado para o filtro.</td></tr>}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <div className="col-12">
-          <div className="card card-body">
-            <h6><i className="fa-solid fa-sliders me-2" />Tipos de dados</h6>
-            <div className="row g-3 mt-1">
-              {DATA_TYPE_FIELDS.map((field) => (
-                <DataTypeEditor
-                  key={field.key}
-                  field={field}
-                  values={dataTypes[field.key] || []}
-                  onAdd={(v) => addDataTypeValue(field.key, v)}
-                  onRemove={(v) => removeDataTypeValue(field.key, v)}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="col-12 d-flex justify-content-end">
-          <button type="button" className="btn btn-danger" onClick={deleteAllRecords}>
-            <i className="fa-solid fa-trash me-2" />Excluir todos os registros cadastrados
+        <div className="cluster cluster-end" style={{ marginTop: 12 }}>
+          <button type="button" className="btn btn-danger btn-sm" onClick={() => deleteRecords(selectedRecords)}>
+            <Icon name="trash" size={16} />Excluir selecionados
           </button>
         </div>
+        {loadError ? <p className="alert alert-danger" style={{ marginTop: 12 }}>{loadError}</p> : <p className="muted small" style={{ marginTop: 12 }}>{isMixedTarget ? 'Para editar qualquer campo específico, filtre ou selecione registros de um único tipo.' : 'Você pode editar em massa qualquer campo disponível para o tipo selecionado.'}</p>}
+      </div>
+
+      <div className="card">
+        <h2 className="section-title"><Icon name="squarePen" size={16} />Editar registros</h2>
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th><input type="checkbox" checked={!!displayedRecords.length && displayedRecords.every((record) => selectedIds.includes(`${record.tipo_registro}:${record.id}`))} onChange={toggleSelectAll} /></th>
+                <th>Registro</th>
+                <th>Data</th>
+                <th>Km</th>
+                <th>Valor</th>
+                <th>Descrição</th>
+                <th className="end">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {displayedRecords.map((record) => (
+                <tr key={`${record.tipo_registro}-${record.id}`}>
+                  <td><input type="checkbox" checked={selectedIds.includes(`${record.tipo_registro}:${record.id}`)} onChange={() => toggleSelected(record)} /></td>
+                  <td>
+                    <div className="stack">
+                      <span className={`badge${record.tipo_registro === 'abastecimento' ? ' badge-accent' : ''}`}>{record.tipo_registro}</span>
+                      <span className="muted small">ID #{record.id}</span>
+                    </div>
+                  </td>
+                  <td>{record.data}</td>
+                  <td>{record.quilometragem ? `${Number(record.quilometragem).toFixed(0)} km` : '-'}</td>
+                  <td className="num">R$ {Number(record.valor || 0).toFixed(2)}</td>
+                  <td>{record.descricao || '-'}</td>
+                  <td className="end">
+                    <div className="cluster cluster-end">
+                      <button type="button" className="btn btn-sm btn-accent" onClick={() => navigate(record.tipo_registro === 'abastecimento' ? `/abastecimento?edit=${record.id}` : `/despesa?edit=${record.id}`)}>
+                        <Icon name="pencil" size={14} />Editar
+                      </button>
+                      <button type="button" className="btn btn-sm btn-danger" onClick={() => deleteRecords([record])}>
+                        <Icon name="trash" size={14} />Excluir
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {!filteredRecords.length && <tr><td colSpan={7} className="muted">Nenhum registro encontrado para o filtro.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="card">
+        <h2 className="section-title"><Icon name="sliders" size={16} />Tipos de dados</h2>
+        <div className="grid-3">
+          {DATA_TYPE_FIELDS.map((field) => (
+            <DataTypeEditor
+              key={field.key}
+              field={field}
+              values={dataTypes[field.key] || []}
+              onAdd={(v) => addDataTypeValue(field.key, v)}
+              onRemove={(v) => removeDataTypeValue(field.key, v)}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="cluster cluster-end">
+        <button type="button" className="btn btn-danger" onClick={deleteAllRecords}>
+          <Icon name="trash" size={16} />Excluir todos os registros cadastrados
+        </button>
       </div>
     </div>
   )
@@ -346,22 +336,22 @@ function DataTypeEditor({ field, values, onAdd, onRemove }) {
   const [newValue, setNewValue] = useState('')
 
   return (
-    <div className="col-md-6 col-xl-4">
-      <div className="border rounded-3 p-2 h-100">
-        <div className="fw-semibold mb-2">{field.label}</div>
-        <div className="d-flex gap-2 mb-2">
-          <input className="form-control form-control-sm" value={newValue} onChange={(e) => setNewValue(e.target.value)} placeholder={field.placeholder} />
-          <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => { onAdd(newValue); setNewValue('') }}>Adicionar</button>
-        </div>
-        <div className="d-flex flex-wrap gap-1">
-          {values.map((item) => (
-            <span key={item.id || item.value} className="badge text-bg-light border">
-              {item.value}
-              <button type="button" className="btn btn-sm py-0 px-1 ms-1" onClick={() => onRemove(item)} title="Remover"><i className="fa-solid fa-xmark" /></button>
-            </span>
-          ))}
-          {!values.length && <small className="text-muted">Nenhum item cadastrado.</small>}
-        </div>
+    <div className="card">
+      <div className="section-title">{field.label}</div>
+      <div className="inline-add">
+        <input className="input" value={newValue} onChange={(e) => setNewValue(e.target.value)} placeholder={field.placeholder} />
+        <button type="button" className="btn btn-sm btn-accent" onClick={() => { onAdd(newValue); setNewValue('') }}>Adicionar</button>
+      </div>
+      <div className="cluster" style={{ marginTop: 8 }}>
+        {values.map((item) => (
+          <span key={item.id || item.value} className="chip">
+            {item.value}
+            <button type="button" className="chip-btn" onClick={() => onRemove(item)} title="Remover" aria-label="Remover">
+              <Icon name="x" size={14} />
+            </button>
+          </span>
+        ))}
+        {!values.length && <span className="muted small">Nenhum item cadastrado.</span>}
       </div>
     </div>
   )
@@ -370,7 +360,7 @@ function DataTypeEditor({ field, values, onAdd, onRemove }) {
 function BulkValueInput({ field, value, onChange }) {
   if (field?.input === 'boolean') {
     return (
-      <select className="form-select" value={value} onChange={(e) => onChange(e.target.value)}>
+      <select className="select" value={value} onChange={(e) => onChange(e.target.value)}>
         <option value="">Selecione</option>
         <option value="true">Sim</option>
         <option value="false">Não</option>
@@ -380,7 +370,7 @@ function BulkValueInput({ field, value, onChange }) {
 
   return (
     <input
-      className="form-control"
+      className="input"
       type={field?.input || 'text'}
       value={value}
       onChange={(e) => onChange(e.target.value)}
@@ -391,13 +381,9 @@ function BulkValueInput({ field, value, onChange }) {
 
 function SummaryCard({ icon, label, value }) {
   return (
-    <div className="col-6 col-lg-3">
-      <div className="card h-100 records-summary-card">
-        <div className="card-body">
-          <small className="text-muted d-block mb-1"><i className={`${icon} me-2`} />{label}</small>
-          <h5 className="mb-0">{value}</h5>
-        </div>
-      </div>
+    <div className="metric-card">
+      <div className="label"><Icon name={icon} size={14} />{label}</div>
+      <div className="value">{value}</div>
     </div>
   )
 }

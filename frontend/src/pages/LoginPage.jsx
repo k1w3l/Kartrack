@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import api, { API_BASE_URL } from '../api'
 import FipeLookupForm from '../components/FipeLookupForm'
+import Icon from '../components/Icon'
 
 function getApiErrorMessage(error, isRegister) {
   const fallback = isRegister ? 'Falha no cadastro' : 'Falha no login'
@@ -72,28 +73,26 @@ export default function LoginPage({ onLogin, darkMode, onToggleTheme }) {
   }
 
   return (
-    <div className="position-relative min-vh-100">
+    <div className="login-screen relative">
       <button
         type="button"
-        className="btn btn-outline-secondary btn-sm icon-btn position-absolute top-0 end-0 m-3"
+        className="btn btn-ghost icon-btn login-theme"
         onClick={onToggleTheme}
         aria-pressed={darkMode}
         title={darkMode ? 'Ativar tema claro' : 'Ativar tema escuro'}
       >
-        <i className={`fa-solid ${darkMode ? 'fa-toggle-on' : 'fa-toggle-off'}`} />
+        <Icon name={darkMode ? 'sun' : 'moon'} />
       </button>
-      <div className="container py-5" style={{ maxWidth: 500 }}>
-        <div className="text-center mb-4">
-          <div className="login-logo">
-            <img
-              src={`${apiOrigin}/uploads/${darkMode ? 'logo_dark.svg' : 'logo_light.svg'}`}
-              alt="Kartrack"
-              onError={(e) => { e.currentTarget.style.display = 'none' }}
-            />
-          </div>
+      <div className="login-panel">
+        <div className="login-logo">
+          <img
+            src={`${apiOrigin}/uploads/${darkMode ? 'logo_dark.svg' : 'logo_light.svg'}`}
+            alt="Kartrack"
+            onError={(e) => { e.currentTarget.style.display = 'none' }}
+          />
         </div>
 
-        <div className="login-tabs mb-3" role="tablist" aria-label="Acesso e consulta FIPE">
+        <div className="login-tabs" role="tablist" aria-label="Acesso e consulta FIPE">
           <button
             type="button"
             role="tab"
@@ -115,13 +114,13 @@ export default function LoginPage({ onLogin, darkMode, onToggleTheme }) {
         </div>
 
         {activeTab === 'login' ? (
-          <form className="login-form-panel" onSubmit={submit} role="tabpanel">
+          <form className="card stack" onSubmit={submit} role="tabpanel">
             {isRegister && (
-              <div className="mb-2">
-                <label className="form-label" htmlFor="login-name">Nome</label>
+              <div className="field">
+                <label className="field-label" htmlFor="login-name">Nome</label>
                 <input
                   id="login-name"
-                  className="form-control"
+                  className="input"
                   placeholder="Seu nome"
                   autoComplete="name"
                   value={form.name}
@@ -131,11 +130,11 @@ export default function LoginPage({ onLogin, darkMode, onToggleTheme }) {
                 />
               </div>
             )}
-            <div className="mb-2">
-              <label className="form-label" htmlFor="login-email">E-mail</label>
+            <div className="field">
+              <label className="field-label" htmlFor="login-email">E-mail</label>
               <input
                 id="login-email"
-                className="form-control"
+                className="input"
                 placeholder="voce@exemplo.com"
                 type="email"
                 inputMode="email"
@@ -145,12 +144,12 @@ export default function LoginPage({ onLogin, darkMode, onToggleTheme }) {
                 required
               />
             </div>
-            <div className={isRegister ? 'mb-1' : 'mb-3'}>
-              <label className="form-label" htmlFor="login-password">Senha</label>
-              <div className="input-group">
+            <div className="field">
+              <label className="field-label" htmlFor="login-password">Senha</label>
+              <div className="input-row">
                 <input
                   id="login-password"
-                  className="form-control"
+                  className="input"
                   placeholder="Sua senha"
                   type={showPassword ? 'text' : 'password'}
                   autoComplete={isRegister ? 'new-password' : 'current-password'}
@@ -159,22 +158,23 @@ export default function LoginPage({ onLogin, darkMode, onToggleTheme }) {
                   minLength={6}
                   required
                 />
-                <button type="button" className="btn btn-outline-secondary" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>
-                  <i className={`fa-solid ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`} />
+                <button type="button" className="btn btn-ghost icon-btn" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>
+                  <Icon name={showPassword ? 'eyeOff' : 'eye'} />
                 </button>
               </div>
             </div>
-            {isRegister && <small className="text-muted d-block mt-2 mb-3">A senha deve conter pelo menos 6 caracteres.</small>}
+            {isRegister && <p className="muted small">A senha deve conter pelo menos 6 caracteres.</p>}
 
-            {success && <div className="alert alert-success py-2">{success}</div>}
-            {error && <div className="alert alert-danger py-2">{error}</div>}
+            {success && <div className="alert alert-ok">{success}</div>}
+            {error && <div className="alert alert-danger">{error}</div>}
 
-            <button className="btn btn-primary w-100" disabled={loading}>
+            <button className="btn btn-primary w-full" disabled={loading}>
               {loading ? 'Processando...' : isRegister ? 'Cadastrar' : 'Entrar'}
             </button>
             <button
               type="button"
-              className="btn btn-link mt-2 w-100 text-center"
+              className="btn btn-link"
+              style={{ justifyContent: 'center' }}
               onClick={() => {
                 setError('')
                 setSuccess('')
@@ -185,8 +185,8 @@ export default function LoginPage({ onLogin, darkMode, onToggleTheme }) {
             </button>
           </form>
         ) : (
-          <div className="login-form-panel" role="tabpanel">
-            <p className="text-muted small mb-3">Consulte o valor de mercado na tabela FIPE sem precisar entrar na conta.</p>
+          <div className="card stack" role="tabpanel">
+            <p className="muted small">Consulte o valor de mercado na tabela FIPE sem precisar entrar na conta.</p>
             <FipeLookupForm />
           </div>
         )}

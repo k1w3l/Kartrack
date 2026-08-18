@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api'
 import Modal from '../components/Modal'
+import Icon, { recordIconName } from '../components/Icon'
 import { Spinner, TimelineSkeleton } from '../components/Loading'
 import { useUI } from '../components/UIProvider'
 
@@ -11,13 +12,12 @@ function formatDateBR(isoDate) {
   return new Date(`${isoDate}T00:00:00`).toLocaleDateString('pt-BR')
 }
 
-function getRecordIcon(tipo) {
-  const t = (tipo || '').toLowerCase()
-  if (t.includes('abastecimento')) return 'fa-solid fa-gas-pump'
-  if (t.includes('fipe')) return 'fa-solid fa-tags'
-  if (t.includes('manutenção')) return 'fa-solid fa-screwdriver-wrench'
-  if (t.includes('multa')) return 'fa-solid fa-file-circle-exclamation'
-  return 'fa-solid fa-wallet'
+function timelineTone(tipo) {
+  const t = String(tipo || '').toLowerCase()
+  if (t.includes('abastecimento')) return 'is-fuel'
+  if (t.includes('multa')) return 'is-danger'
+  if (t.includes('manutenção')) return 'is-warn'
+  return ''
 }
 
 function formatTipoRegistro(tipo) {
@@ -197,6 +197,7 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
   const [selectedReminderIds, setSelectedReminderIds] = useState([])
   const [filtersHydrated, setFiltersHydrated] = useState(false)
   const [detailModal, setDetailModal] = useState(null)
+  const [expandedIds, setExpandedIds] = useState([])
   const printAreaRef = useRef(null)
 
   const load = async () => {
@@ -381,14 +382,12 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
     const w = window.open('', '_blank')
     if (!w) return
     w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8" /><title>Timeline Kartrack</title><style>
-      body { font-family: Inter, system-ui, sans-serif; color: #0f172a; margin: 24px; }
-      h6, .timeline-title { font-size: 16px; margin: 0 0 12px; font-weight: 700; }
-      .timeline-item { border: 1px solid #dbe2ee; border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
-      .timeline-top-row { display: flex; justify-content: space-between; gap: 8px; }
-      .timeline-separator { color: #94a3b8; margin: 0 6px; }
-      .timeline-consumo { color: #2563eb; font-weight: 600; }
-      .timeline-actions, .timeline-hover-card, button, .btn { display: none !important; }
-      small { color: #64748b; }
+      body { font-family: Chivo, system-ui, sans-serif; color: #1a1814; margin: 24px; }
+      .section-title { font-size: 16px; margin: 0 0 12px; font-weight: 700; }
+      .timeline-item { border-bottom: 1px solid #d6cfc2; padding: 10px 0; }
+      .timeline-actions, .timeline-details, button, .btn { display: none !important; }
+      .muted { color: #6f675c; }
+      .num, .timeline-valor { font-family: "Chivo Mono", monospace; }
     </style></head><body>${content}</body></html>`)
     w.document.close()
     w.focus()
@@ -398,159 +397,182 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
   if (!vehicleId) return <div className="alert alert-info">Cadastre um veículo em "Meu veículo".</div>
   if (loading && !dashboard) return <Spinner label="Carregando dados do veículo..." />
 
+  const toggleExpanded = (key) => {
+    setExpandedIds((prev) => prev.includes(key) ? prev.filter((id) => id !== key) : [...prev, key])
+  }
+
   return (
-    <>
-      <div className="timeline-header mb-3">
-        <div className="d-flex gap-2 flex-wrap align-items-stretch">
-          <div className="vehicle-chip vehicle-photo-card card">
-            <div className="card-body p-2 d-flex align-items-center justify-content-center">
-              {currentVehicle?.foto_url ? (
-                <img src={currentVehicle.foto_url} alt={currentVehicle.nome} className="vehicle-thumb" />
-              ) : (
-                <div className="vehicle-thumb d-flex align-items-center justify-content-center"><i className="fa-solid fa-car" /></div>
-              )}
-            </div>
-          </div>
-          <div className="vehicle-chip vehicle-info-card card">
-            <div className="card-body p-2">
-              <div className="d-flex flex-column gap-1 vehicle-chip-info">
-                <h6 className="mb-0">{currentVehicle?.nome || 'Não definido'}</h6>
-                <small>{currentVehicle?.marca} {currentVehicle?.modelo} • {currentVehicle?.ano}</small>
-                <small><strong>Placa:</strong> {currentVehicle?.placa || '-'}</small>
-                <small><strong>Combustível:</strong> {currentVehicle?.combustivel_principal || '-'}</small>
-                <small><strong>Km atual:</strong> {dashboard.quilometragem_atual} km</small>
-                <small><strong>FIPE:</strong> {brl.format(Number(currentVehicle?.valor_fipe || 0))}</small>
-              </div>
+    <div className="stack-lg">
+      <div className="timeline-header">
+        <div className="vehicle-strip">
+          {currentVehicle?.foto_url ? (
+            <img src={currentVehicle.foto_url} alt={currentVehicle.nome} />
+          ) : (
+            <div className="vehicle-thumb"><Icon name="car" size={28} /></div>
+          )}
+          <div className="vehicle-strip-meta">
+            <h2>{currentVehicle?.nome || 'Não definido'}</h2>
+            <p className="muted small">{currentVehicle?.marca} {currentVehicle?.modelo} • {currentVehicle?.ano}</p>
+            <div className="vehicle-kpis">
+              <span>Placa <strong className="plate">{currentVehicle?.placa || '-'}</strong></span>
+              <span>Km <strong>{dashboard.quilometragem_atual}</strong></span>
+              <span>FIPE <strong>{brl.format(Number(currentVehicle?.valor_fipe || 0))}</strong></span>
             </div>
           </div>
         </div>
 
         <div className="timeline-filters">
           <input
-            className="form-control form-control-sm timeline-search-input"
+            className="input timeline-search"
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Pesquisar"
             aria-label="Pesquisar registros da timeline"
           />
-          <select className="form-select form-select-sm" value={periodMode} onChange={(e) => setPeriodMode(e.target.value)}>
+          <select className="select" value={periodMode} onChange={(e) => setPeriodMode(e.target.value)}>
             <option value="mes">Mês/ano</option>
             <option value="periodo">Período</option>
             <option value="historico">Histórico completo</option>
           </select>
           {periodMode === 'mes' && (
             <>
-              <select className="form-select form-select-sm" value={month} onChange={(e) => setMonth(e.target.value)}>{Array.from({ length: 12 }).map((_, i) => { const m = String(i + 1).padStart(2, '0'); return <option key={m} value={m}>{m}</option> })}</select>
-              <select className="form-select form-select-sm" value={year} onChange={(e) => setYear(e.target.value)}>{Array.from({ length: 8 }).map((_, i) => { const y = String(now.getFullYear() - i); return <option key={y} value={y}>{y}</option> })}</select>
+              <select className="select" value={month} onChange={(e) => setMonth(e.target.value)}>{Array.from({ length: 12 }).map((_, i) => { const m = String(i + 1).padStart(2, '0'); return <option key={m} value={m}>{m}</option> })}</select>
+              <select className="select" value={year} onChange={(e) => setYear(e.target.value)}>{Array.from({ length: 8 }).map((_, i) => { const y = String(now.getFullYear() - i); return <option key={y} value={y}>{y}</option> })}</select>
             </>
           )}
           {periodMode === 'periodo' && (
             <>
-              <input className="form-control form-control-sm" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-              <input className="form-control form-control-sm" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+              <input className="input" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+              <input className="input" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
             </>
           )}
-          <select className="form-select form-select-sm" value={tipoFiltro} onChange={(e) => { setTipoFiltro(e.target.value); setPage(1) }}>
+          <select className="select" value={tipoFiltro} onChange={(e) => { setTipoFiltro(e.target.value); setPage(1) }}>
             <option value="todos">Todos os tipos</option>
             {[...new Set(timeline.map((i) => i.tipo_registro))].map((tipo) => <option key={tipo} value={tipo}>{formatTipoRegistro(tipo)}</option>)}
           </select>
-          <select className="form-select form-select-sm" value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1) }}>
+          <select className="select" value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1) }}>
             <option value={10}>10 por página</option>
             <option value={25}>25 por página</option>
             <option value={50}>50 por página</option>
           </select>
-          <button type="button" className="btn btn-sm btn-outline-dark" onClick={exportTimelinePdf}><i className="fa-solid fa-file-pdf me-1" />PDF</button>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={exportTimelinePdf}><Icon name="fileDown" size={16} />PDF</button>
         </div>
       </div>
 
-      <div className="row row-cols-1 row-cols-md-2 row-cols-xl-3 row-cols-xxl-5 g-3 mb-4">
-        <Card icon="fa-solid fa-sack-dollar" title="Despesas" value={brl.format(metricas.totalDespesas)} />
-        <Card icon="fa-solid fa-gas-pump" title="Abastecimentos" value={brl.format(metricas.totalAbastecimentos)} />
-        <Card icon="fa-solid fa-sack-dollar" title="Custo total" value={brl.format(metricas.custoTotal)} />
-        <Card icon="fa-solid fa-gauge-high" title="Média de consumo" value={`${metricas.mediaConsumo.toFixed(2)} km/l`} />
-        <Card icon="fa-solid fa-road" title="Km rodado" value={`${metricas.quilometragemMensal.toFixed(0)} km`} />
+      <div className="metric-grid">
+        <MetricCard icon="wallet" title="Despesas" value={brl.format(metricas.totalDespesas)} />
+        <MetricCard icon="fuel" title="Abastecimentos" value={brl.format(metricas.totalAbastecimentos)} />
+        <MetricCard icon="banknote" title="Custo total" value={brl.format(metricas.custoTotal)} />
+        <MetricCard icon="gauge" title="Média de consumo" value={`${metricas.mediaConsumo.toFixed(2)} km/l`} />
+        <MetricCard icon="route" title="Km rodado" value={`${metricas.quilometragemMensal.toFixed(0)} km`} />
       </div>
 
-      <div className="card mb-4"><div className="card-body"><h6><i className="fa-solid fa-bell me-2" />Lembretes de manutenção</h6>{dashboard.lembretes.length ? <ul className="list-unstyled mb-0">{dashboard.lembretes.map((raw) => {
-        const [id, l] = String(raw).split('::')
-        const days = Number((String(l).match(/faltam\s+(-?\d+)\s+dias/i) || [])[1])
-        const kms = Number((String(l).match(/faltam\s+(-?\d+)\s+km/i) || [])[1])
-        const isDanger = Number.isFinite(days) ? days <= 30 : Number.isFinite(kms) ? kms <= 1000 : false
-        const isWarning = !isDanger && (Number.isFinite(days) ? days <= 60 : Number.isFinite(kms) ? kms <= 2000 : false)
-        return <li key={raw} className={`${isDanger ? 'text-danger fw-semibold' : isWarning ? 'reminder-warning' : ''} d-flex align-items-center gap-2 py-1`}>
-          <input type="checkbox" className="form-check-input mt-0" checked={selectedReminderIds.includes(id)} title="Marcar lembrete para exclusão" onChange={(e) => setSelectedReminderIds((prev) => e.target.checked ? [...new Set([...prev, id])] : prev.filter((x) => x !== id))} />
-          {isDanger ? <i className="fa-solid fa-triangle-exclamation me-1" /> : null}
-          <span>{l}</span>
-        </li>
-      })}</ul> : <p className="text-muted">Sem lembretes por enquanto.</p>}
-        {!!selectedReminderIds.length && <div className="mt-2"><button type="button" className="btn btn-sm btn-outline-danger" onClick={async () => { for (const id of selectedReminderIds) await api.post(`/expenses/${id}/confirm-reminder`); setSelectedReminderIds([]); await load() }}><i className="fa-solid fa-check me-1" />Confirmar exclusão dos lembretes</button></div>}
-      </div></div>
-
-      <div className="card"><div className="card-body" ref={printAreaRef}><h6 className="timeline-title"><i className="fa-solid fa-list me-2" />Linha do tempo</h6>
-        <small className="text-muted d-block mt-1">Exibindo {timelineExibida.length} de {timelineFiltrada.length} registro(s) no filtro atual.</small>
-        {loading ? <TimelineSkeleton /> : (
-        <div className="d-flex flex-column gap-3 mt-3">
-          {paginatedTimeline.map((item, idx) => (
-            <div className="timeline-item" key={`${item.tipo_registro}-${item.id}`} style={{ animationDelay: `${Math.min(idx, 8) * 45}ms` }}>
-              <div className="timeline-top-row">
-                <div className="timeline-main">
-                  <strong><i className={`${getRecordIcon(item.tipo_registro)} me-2`} />{formatTipoRegistro(item.tipo_registro)}</strong>
-                  {item.tipo_registro === 'abastecimento' && item.consumo_km_l !== null && item.consumo_km_l !== undefined ? (
-                    <>
-                      <span className="timeline-separator">|</span>
-                      <span className="timeline-consumo"><i className="fa-solid fa-gauge-high me-1" />{item.consumo_km_l} km/l</span>
-                    </>
-                  ) : null}
-                  <span className="timeline-separator">|</span>
-                  <span className="timeline-valor">{brl.format(item.valor)}</span>
-                </div>
-                <div className="timeline-actions">
-                  <button type="button" className="btn btn-sm btn-outline-dark" title="Visualizar" onClick={() => viewRecord(item)}><i className="fa-solid fa-eye" /></button>
-                  <button type="button" className="btn btn-sm btn-outline-secondary" title="Clonar" onClick={() => cloneRecord(item)}><i className="fa-solid fa-clone" /></button>
-                  <button type="button" className="btn btn-sm btn-outline-primary" title="Editar" onClick={() => editRecord(item)}><i className="fa-solid fa-pen-to-square" /></button>
-                  <button type="button" className="btn btn-sm btn-outline-danger" title="Excluir" onClick={() => deleteRecord(item)}><i className="fa-solid fa-trash" /></button>
-                </div>
-              </div>
-              <small>{buildTimelineDescription(item)}</small>
-              {!!buildHoverDetails(item).length && (
-                <div className="timeline-hover-card">
-                  {buildHoverDetails(item).map((detail, di) => <div key={`${item.id}-${di}`}>{detail}</div>)}
-                </div>
-              )}
-            </div>
-          ))}
-          {!timelineExibida.length && <p className="text-muted mb-0">Nenhum registro encontrado para o filtro selecionado.</p>}
-        </div>
-        )}
-        {!!timelineExibida.length && <div className="d-flex align-items-center justify-content-between mt-3">
-          <small className="text-muted">Página {page} de {totalPages}</small>
-          <div className="d-flex gap-2">
-            <button type="button" className="btn btn-sm btn-outline-secondary" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Anterior</button>
-            <button type="button" className="btn btn-sm btn-outline-secondary" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>Próxima</button>
+      <div className="card">
+        <h3 className="section-title"><Icon name="bell" size={16} />Lembretes de manutenção</h3>
+        {dashboard.lembretes.length ? (
+          <div className="lamp-list">
+            {dashboard.lembretes.map((raw) => {
+              const [id, l] = String(raw).split('::')
+              const days = Number((String(l).match(/faltam\s+(-?\d+)\s+dias/i) || [])[1])
+              const kms = Number((String(l).match(/faltam\s+(-?\d+)\s+km/i) || [])[1])
+              const isDanger = Number.isFinite(days) ? days <= 30 : Number.isFinite(kms) ? kms <= 1000 : false
+              const isWarning = !isDanger && (Number.isFinite(days) ? days <= 60 : Number.isFinite(kms) ? kms <= 2000 : false)
+              return (
+                <label key={raw} className={`lamp-item${isDanger ? ' is-danger' : isWarning ? ' is-warn' : ''}`}>
+                  <input type="checkbox" checked={selectedReminderIds.includes(id)} title="Marcar lembrete para exclusão" onChange={(e) => setSelectedReminderIds((prev) => e.target.checked ? [...new Set([...prev, id])] : prev.filter((x) => x !== id))} />
+                  {isDanger ? <Icon name="triangleAlert" size={16} /> : null}
+                  <span>{l}</span>
+                </label>
+              )
+            })}
           </div>
-        </div>}
-      </div></div>
+        ) : <p className="muted">Sem lembretes por enquanto.</p>}
+        {!!selectedReminderIds.length && (
+          <div style={{ marginTop: 12 }}>
+            <button type="button" className="btn btn-danger btn-sm" onClick={async () => { for (const id of selectedReminderIds) await api.post(`/expenses/${id}/confirm-reminder`); setSelectedReminderIds([]); await load() }}>
+              <Icon name="check" size={16} />Confirmar exclusão dos lembretes
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="card" ref={printAreaRef}>
+        <h3 className="section-title"><Icon name="list" size={16} />Linha do tempo</h3>
+        <p className="muted small">Exibindo {timelineExibida.length} de {timelineFiltrada.length} registro(s) no filtro atual.</p>
+        {loading ? <TimelineSkeleton /> : (
+          <div className="timeline-log">
+            {paginatedTimeline.map((item, idx) => {
+              const key = `${item.tipo_registro}-${item.id}`
+              const details = buildHoverDetails(item)
+              const expanded = expandedIds.includes(key)
+              return (
+                <div className={`timeline-item ${timelineTone(item.tipo_registro)}`} key={key} style={{ animationDelay: `${Math.min(idx, 8) * 45}ms` }}>
+                  <div className="timeline-rail" />
+                  <div>
+                    <div className="timeline-top">
+                      <div className="timeline-main">
+                        <strong className="cluster"><Icon name={recordIconName(item.tipo_registro)} size={16} />{formatTipoRegistro(item.tipo_registro)}</strong>
+                        {item.tipo_registro === 'abastecimento' && item.consumo_km_l !== null && item.consumo_km_l !== undefined ? (
+                          <span className="timeline-consumo">{item.consumo_km_l} km/l</span>
+                        ) : null}
+                        <span className="timeline-valor">{brl.format(item.valor)}</span>
+                      </div>
+                      <div className="timeline-actions">
+                        {!!details.length && (
+                          <button type="button" className="btn btn-ghost btn-sm icon-btn" title={expanded ? 'Ocultar detalhes' : 'Ver detalhes'} onClick={() => toggleExpanded(key)}>
+                            <Icon name="info" size={16} />
+                          </button>
+                        )}
+                        <button type="button" className="btn btn-ghost btn-sm icon-btn" title="Visualizar" onClick={() => viewRecord(item)}><Icon name="eye" size={16} /></button>
+                        <button type="button" className="btn btn-ghost btn-sm icon-btn" title="Clonar" onClick={() => cloneRecord(item)}><Icon name="copy" size={16} /></button>
+                        <button type="button" className="btn btn-accent btn-sm icon-btn" title="Editar" onClick={() => editRecord(item)}><Icon name="squarePen" size={16} /></button>
+                        <button type="button" className="btn btn-danger btn-sm icon-btn" title="Excluir" onClick={() => deleteRecord(item)}><Icon name="trash" size={16} /></button>
+                      </div>
+                    </div>
+                    <p className="muted small">{buildTimelineDescription(item)}</p>
+                    {!!details.length && (
+                      <div className="timeline-details" hidden={!expanded}>
+                        {details.map((detail, di) => <div key={`${item.id}-${di}`}>{detail}</div>)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+            {!timelineExibida.length && <p className="muted">Nenhum registro encontrado para o filtro selecionado.</p>}
+          </div>
+        )}
+        {!!timelineExibida.length && (
+          <div className="cluster cluster-spread" style={{ marginTop: 16 }}>
+            <p className="muted small">Página {page} de {totalPages}</p>
+            <div className="cluster">
+              <button type="button" className="btn btn-ghost btn-sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Anterior</button>
+              <button type="button" className="btn btn-ghost btn-sm" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>Próxima</button>
+            </div>
+          </div>
+        )}
+      </div>
       <Modal
         open={Boolean(detailModal)}
         onClose={() => setDetailModal(null)}
         width="min(760px, 94vw)"
         title={detailModal ? formatTipoRegistro(detailModal.item.tipo_registro) : ''}
-        titleIcon={detailModal ? getRecordIcon(detailModal.item.tipo_registro) : ''}
+        titleIcon={detailModal ? recordIconName(detailModal.item.tipo_registro) : ''}
         footer={detailModal && (
           <>
-            <button type="button" className="btn btn-outline-secondary" onClick={() => setDetailModal(null)}>Cancelar</button>
+            <button type="button" className="btn btn-ghost" onClick={() => setDetailModal(null)}>Cancelar</button>
             <button type="button" className="btn btn-primary" onClick={() => { const item = detailModal.item; setDetailModal(null); editRecord(item) }}>Editar</button>
           </>
         )}
       >
         {detailModal && (
           <>
-            <small className="text-muted d-block mb-2">ID #{detailModal.item.id}</small>
+            <p className="muted small" style={{ marginBottom: 12 }}>ID #{detailModal.item.id}</p>
             <div className="timeline-modal-grid">
               {buildFieldRows(detailModal.data, detailModal.item).map(([label, value]) => (
                 <div key={label} className="timeline-modal-field">
-                  <small className="text-muted d-block">{label}</small>
+                  <p className="muted small">{label}</p>
                   <div>{value}</div>
                 </div>
               ))}
@@ -558,10 +580,15 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
           </>
         )}
       </Modal>
-    </>
+    </div>
   )
 }
 
-function Card({ icon, title, value }) {
-  return <div className="col"><div className="card shadow-sm h-100"><div className="card-body"><h6><i className={`${icon} me-2`} />{title}</h6><h4>{value}</h4></div></div></div>
+function MetricCard({ icon, title, value }) {
+  return (
+    <div className="metric-card">
+      <div className="label"><Icon name={icon} size={14} />{title}</div>
+      <div className="value">{value}</div>
+    </div>
+  )
 }

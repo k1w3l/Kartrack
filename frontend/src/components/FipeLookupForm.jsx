@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import api from '../api'
+import Icon from './Icon'
 
 const VEHICLE_TYPES = [
   { value: 'cars', label: 'Carros' },
@@ -118,11 +119,11 @@ export default function FipeLookupForm() {
 
   return (
     <div>
-      <div className="mb-3">
-        <label className="form-label" htmlFor="fipe-vehicle-type">Tipo</label>
+      <div className="field">
+        <label className="field-label" htmlFor="fipe-vehicle-type">Tipo</label>
         <select
           id="fipe-vehicle-type"
-          className="form-select"
+          className="select"
           value={vehicleType}
           onChange={(e) => setVehicleType(e.target.value)}
         >
@@ -132,11 +133,11 @@ export default function FipeLookupForm() {
         </select>
       </div>
 
-      <div className="mb-3">
-        <label className="form-label" htmlFor="fipe-brand">Marca</label>
+      <div className="field">
+        <label className="field-label" htmlFor="fipe-brand">Marca</label>
         <select
           id="fipe-brand"
-          className="form-select"
+          className="select"
           value={brandId}
           onChange={(e) => setBrandId(e.target.value)}
           disabled={loadingBrands}
@@ -148,11 +149,11 @@ export default function FipeLookupForm() {
         </select>
       </div>
 
-      <div className="mb-3">
-        <label className="form-label" htmlFor="fipe-model">Modelo</label>
+      <div className="field">
+        <label className="field-label" htmlFor="fipe-model">Modelo</label>
         <select
           id="fipe-model"
-          className="form-select"
+          className="select"
           value={modelId}
           onChange={(e) => setModelId(e.target.value)}
           disabled={!brandId || loadingModels}
@@ -164,11 +165,11 @@ export default function FipeLookupForm() {
         </select>
       </div>
 
-      <div className="mb-3">
-        <label className="form-label" htmlFor="fipe-year">Ano/combustível</label>
+      <div className="field">
+        <label className="field-label" htmlFor="fipe-year">Ano/combustível</label>
         <select
           id="fipe-year"
-          className="form-select"
+          className="select"
           value={yearCode}
           onChange={(e) => setYearCode(e.target.value)}
           disabled={!modelId || loadingYears}
@@ -180,28 +181,28 @@ export default function FipeLookupForm() {
         </select>
       </div>
 
-      {error && <div className="alert alert-danger py-2">{error}</div>}
+      {error && <div className="alert alert-danger">{error}</div>}
 
       {loadingPrice && (
-        <div className="text-muted small mb-2">
-          <i className="fa-solid fa-spinner fa-spin me-2" />Consultando valor FIPE...
+        <div className="muted small cluster">
+          <Icon name="loader" size={16} spin />Consultando valor FIPE...
         </div>
       )}
 
       {result && !loadingPrice && (
-        <div className="fipe-lookup-result alert alert-success mb-0">
+        <div className="alert alert-ok">
           <div className="fipe-lookup-price">{brl.format(Number(result.valor_fipe || 0))}</div>
           {(result.marca || result.modelo) && (
-            <div className="small mt-1">
+            <div className="small">
               {[result.marca, result.modelo].filter(Boolean).join(' · ')}
             </div>
           )}
-          <div className="small text-muted mt-2">
-            {result.ano_modelo != null && <span className="me-3"><strong>Ano:</strong> {result.ano_modelo}</span>}
-            {result.combustivel && <span className="me-3"><strong>Combustível:</strong> {result.combustivel}</span>}
+          <div className="muted small">
+            {result.ano_modelo != null && <span><strong>Ano:</strong> {result.ano_modelo}</span>}
+            {result.combustivel && <span><strong>Combustível:</strong> {result.combustivel}</span>}
           </div>
-          <div className="small text-muted mt-1">
-            {result.fipe_reference && <span className="me-3"><strong>Tabela:</strong> {result.fipe_reference}</span>}
+          <div className="muted small">
+            {result.fipe_reference && <span><strong>Tabela:</strong> {result.fipe_reference}</span>}
             {result.fipe_code && <span><strong>Código:</strong> {result.fipe_code}</span>}
           </div>
         </div>

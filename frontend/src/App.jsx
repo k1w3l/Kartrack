@@ -18,8 +18,7 @@ export default function App() {
   const [user, setUser] = useState(null)
   const [vehicleId, setVehicleId] = useState(null)
   const [vehicles, setVehicles] = useState([])
-  const [darkMode, setDarkMode] = useState(localStorage.getItem('theme') === 'dark')
-  const [menuOpen, setMenuOpen] = useState(false)
+  const [darkMode, setDarkMode] = useState(localStorage.getItem('theme') !== 'light')
 
   const apiOrigin = API_BASE_URL.replace(/\/api\/?$/, '')
 
@@ -27,7 +26,6 @@ export default function App() {
     const el = document.documentElement
     el.classList.toggle('theme-dark', darkMode)
     el.classList.toggle('theme-light', !darkMode)
-    el.setAttribute('data-bs-theme', darkMode ? 'dark' : 'light')
   }, [darkMode])
 
   useEffect(() => {
@@ -132,9 +130,9 @@ export default function App() {
       onToggleTheme={toggleTheme}
       darkMode={darkMode}
       onLogout={logout}
-      menuOpen={menuOpen}
-      onToggleMenu={() => setMenuOpen((v) => !v)}
-      onCloseMenu={() => setMenuOpen(false)}
+      vehicles={vehicles}
+      vehicleId={vehicleId}
+      onSelectVehicle={setVehicleId}
     >
       <Routes>
         <Route path="/" element={<DashboardPage vehicleId={vehicleId} currentVehicle={currentVehicle} />} />

@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef } from 'react'
+import Icon from './Icon'
 
 const FOCUSABLE = 'a[href], button:not([disabled]), textarea, input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
@@ -68,21 +69,19 @@ export default function Modal({ open, onClose, title, titleIcon, children, foote
         tabIndex={-1}
         style={{ width }}
       >
-        <div className="card-body">
-          {title && (
-            <div className="d-flex justify-content-between align-items-start gap-3 mb-2">
-              <h5 className="mb-0" id={titleId}>
-                {titleIcon && <i className={`${titleIcon} me-2`} />}
-                {title}
-              </h5>
-              <button type="button" className="btn btn-sm btn-outline-secondary icon-btn" onClick={() => onClose?.()} aria-label="Fechar">
-                <i className="fa-solid fa-xmark" />
-              </button>
-            </div>
-          )}
-          {children}
-          {footer && <div className="d-flex justify-content-end gap-2 mt-3 flex-wrap">{footer}</div>}
-        </div>
+        {title && (
+          <div className="modal-head">
+            <h2 id={titleId} className="section-title" style={{ marginBottom: 0 }}>
+              {titleIcon ? <Icon name={titleIcon} size={18} /> : null}
+              {title}
+            </h2>
+            <button type="button" className="btn btn-ghost icon-btn btn-sm" onClick={() => onClose?.()} aria-label="Fechar">
+              <Icon name="x" />
+            </button>
+          </div>
+        )}
+        {children}
+        {footer && <div className="modal-foot">{footer}</div>}
       </div>
     </div>
   )

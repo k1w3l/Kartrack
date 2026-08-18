@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import api, { API_BASE_URL } from '../api'
 import { useUI } from '../components/UIProvider'
+import Icon from '../components/Icon'
+import { ButtonSpinner } from '../components/Loading'
 
 const emptyForm = {
   id: null,
@@ -191,122 +193,117 @@ export default function VehiclePage({ onSaved, activeVehicleId, setActiveVehicle
   }
 
   return (
-    <div className="d-flex flex-column gap-3">
-      <div className="card card-body">
-        <h4><i className="fa-solid fa-car-side me-2" />Veículos cadastrados</h4>
-        <div className="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3 mt-1">
+    <div className="stack-lg">
+      <div className="card">
+        <h1 className="page-title"><Icon name="car" />Veículos cadastrados</h1>
+        <div className="vehicle-grid">
           {vehicles.map((vehicle) => (
-            <div className="col" key={vehicle.id}>
-              <div className={`card h-100 ${vehicle.id === activeVehicleId ? 'border-primary' : ''}`}>
-                <div className="card-body d-flex flex-column gap-2">
-                  <div className="vehicle-card-main d-flex align-items-start gap-3">
-                    {vehicle.foto_url ? (
-                      <img src={vehicle.foto_url} alt={vehicle.nome} className="vehicle-thumb" />
-                    ) : (
-                      <div className="vehicle-thumb d-flex align-items-center justify-content-center"><i className="fa-solid fa-car" /></div>
-                    )}
-                    <div className="d-flex flex-column gap-1">
-                      <h6 className="mb-0">{vehicle.nome}</h6>
-                      <small>{vehicle.marca} {vehicle.modelo} • {vehicle.ano}</small>
-                      <small><strong>Placa:</strong> {vehicle.placa}</small>
-                      <small><strong>Combustível:</strong> {vehicle.combustivel_principal}</small>
-                      <small><strong>Km atual:</strong> {vehicle.quilometragem_atual}</small>
-                      <small><strong>FIPE:</strong> R$ {Number(vehicle.valor_fipe || 0).toFixed(2)}</small>
-                      {vehicle.fipe_reference && <small><strong>Tabela:</strong> {vehicle.fipe_reference}</small>}
-                      {vehicle.fipe_code && <small><strong>Código FIPE:</strong> {vehicle.fipe_code}</small>}
-                    </div>
-                  </div>
-                  <div className="d-flex gap-2 mt-2 flex-wrap">
-                    <button type="button" className="btn btn-sm btn-outline-secondary vehicle-action-btn" onClick={() => loadToEdit(vehicle)} title="Editar">
-                      <i className="fa-solid fa-pen-to-square me-1" /><span className="action-text">Editar</span>
-                    </button>
-                    <button type="button" className="btn btn-sm btn-outline-success vehicle-action-btn" disabled={syncingId === vehicle.id} onClick={async () => { setSyncingId(vehicle.id); try { await api.post(`/vehicles/${vehicle.id}/fipe-sync`); await loadVehicles(); onSaved?.(); toast.success('Valor FIPE atualizado.') } catch (err) { toast.error(err?.response?.data?.detail || 'Falha ao atualizar a FIPE.') } finally { setSyncingId(null) } }} title="Atualizar FIPE">
-                      <i className={`fa-solid ${syncingId === vehicle.id ? 'fa-spinner fa-spin' : 'fa-arrows-rotate'} me-1`} /><span className="action-text">FIPE</span>
-                    </button>
-                    {vehicle.id !== activeVehicleId && (
-                      <button type="button" className="btn btn-sm btn-outline-primary vehicle-action-btn" onClick={() => setDefault(vehicle.id)} title="Selecionar veículo">
-                        <i className="fa-solid fa-star me-1" /><span className="action-text">Selecionar</span>
-                      </button>
-                    )}
-                    {vehicle.id === activeVehicleId && <span className="badge text-bg-primary" title="Veículo ativo"><i className="fa-solid fa-star" /></span>}
-                    <button type="button" className="btn btn-sm btn-outline-danger ms-auto vehicle-action-btn" onClick={() => removeVehicle(vehicle.id)} title="Deletar">
-                      <i className="fa-solid fa-trash me-1" /><span className="action-text">Deletar</span>
-                    </button>
-                  </div>
+            <div className={`card vehicle-card${vehicle.id === activeVehicleId ? ' is-active' : ''}`} key={vehicle.id}>
+              <div className="vehicle-card-main">
+                {vehicle.foto_url ? (
+                  <img src={vehicle.foto_url} alt={vehicle.nome} className="vehicle-thumb" />
+                ) : (
+                  <div className="vehicle-thumb"><Icon name="car" /></div>
+                )}
+                <div className="stack">
+                  <h3>{vehicle.nome}</h3>
+                  <p className="muted small">{vehicle.marca} {vehicle.modelo} • {vehicle.ano}</p>
+                  <p className="muted small"><strong>Placa:</strong> {vehicle.placa}</p>
+                  <p className="muted small"><strong>Combustível:</strong> {vehicle.combustivel_principal}</p>
+                  <p className="muted small"><strong>Km atual:</strong> {vehicle.quilometragem_atual}</p>
+                  <p className="muted small"><strong>FIPE:</strong> R$ {Number(vehicle.valor_fipe || 0).toFixed(2)}</p>
+                  {vehicle.fipe_reference && <p className="muted small"><strong>Tabela:</strong> {vehicle.fipe_reference}</p>}
+                  {vehicle.fipe_code && <p className="muted small"><strong>Código FIPE:</strong> {vehicle.fipe_code}</p>}
                 </div>
+              </div>
+              <div className="cluster">
+                <button type="button" className="btn btn-sm btn-ghost" onClick={() => loadToEdit(vehicle)} title="Editar">
+                  <Icon name="squarePen" size={14} />Editar
+                </button>
+                <button type="button" className="btn btn-sm btn-ok" disabled={syncingId === vehicle.id} onClick={async () => { setSyncingId(vehicle.id); try { await api.post(`/vehicles/${vehicle.id}/fipe-sync`); await loadVehicles(); onSaved?.(); toast.success('Valor FIPE atualizado.') } catch (err) { toast.error(err?.response?.data?.detail || 'Falha ao atualizar a FIPE.') } finally { setSyncingId(null) } }} title="Atualizar FIPE">
+                  <Icon name="refresh" size={14} spin={syncingId === vehicle.id} />FIPE
+                </button>
+                {vehicle.id !== activeVehicleId && (
+                  <button type="button" className="btn btn-sm btn-accent" onClick={() => setDefault(vehicle.id)} title="Selecionar veículo">
+                    <Icon name="star" size={14} />Selecionar
+                  </button>
+                )}
+                {vehicle.id === activeVehicleId && <span className="badge badge-accent" title="Veículo ativo"><Icon name="star" size={14} /></span>}
+                <button type="button" className="btn btn-sm btn-danger" onClick={() => removeVehicle(vehicle.id)} title="Deletar">
+                  <Icon name="trash" size={14} />Deletar
+                </button>
               </div>
             </div>
           ))}
-          {!vehicles.length && <p className="text-muted">Nenhum veículo cadastrado.</p>}
+          {!vehicles.length && <p className="muted">Nenhum veículo cadastrado.</p>}
         </div>
       </div>
 
-      <form className="card card-body" onSubmit={submit}>
-        <h4>
-          <i className={`fa-solid ${form.id ? 'fa-pen-to-square' : 'fa-plus'} me-2`} />
+      <form className="card" onSubmit={submit}>
+        <h2 className="page-title"><Icon name={form.id ? 'squarePen' : 'plus'} />
           {form.id ? 'Editar veículo' : 'Cadastrar novo veículo'}
-        </h4>
-        <div className="row g-2">
+        </h2>
+        <div className="grid-2">
           {[
             ['nome', 'Nome'],
             ['placa', 'Placa'],
           ].map(([key, label]) => (
-            <div className="col-md-6" key={key}>
-              <label className="form-label"><i className="fa-solid fa-circle-info me-2" />{label}</label>
-              <input className="form-control" value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} required={key !== 'valor_fipe'} />
+            <div className="field" key={key}>
+              <label className="field-label"><Icon name="info" size={14} />{label}</label>
+              <input className="input" value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} required={key !== 'valor_fipe'} />
             </div>
           ))}
-          <div className="col-md-6">
-            <label className="form-label"><i className="fa-solid fa-industry me-2" />Marca</label>
-            <select className="form-select" value={form.fipe_brand_id} onChange={(e) => setForm({ ...form, fipe_brand_id: e.target.value, fipe_model_id: '', fipe_year_code: '' })}>
+          <div className="field">
+            <label className="field-label"><Icon name="factory" size={14} />Marca</label>
+            <select className="select" value={form.fipe_brand_id} onChange={(e) => setForm({ ...form, fipe_brand_id: e.target.value, fipe_model_id: '', fipe_year_code: '' })}>
               <option value="">Selecione</option>
               {brands.map((b) => <option key={b.codigo} value={b.codigo}>{b.nome}</option>)}
             </select>
           </div>
-          <div className="col-md-6">
-            <label className="form-label"><i className="fa-solid fa-car-side me-2" />Modelo</label>
-            <select className="form-select" value={form.fipe_model_id} onChange={(e) => setForm({ ...form, fipe_model_id: e.target.value, fipe_year_code: '' })} disabled={!form.fipe_brand_id}>
+          <div className="field">
+            <label className="field-label"><Icon name="car" size={14} />Modelo</label>
+            <select className="select" value={form.fipe_model_id} onChange={(e) => setForm({ ...form, fipe_model_id: e.target.value, fipe_year_code: '' })} disabled={!form.fipe_brand_id}>
               <option value="">Selecione</option>
               {models.map((m) => <option key={m.codigo} value={m.codigo}>{m.nome}</option>)}
             </select>
           </div>
-          <div className="col-md-6">
-            <label className="form-label"><i className="fa-solid fa-calendar me-2" />Ano/combustível</label>
-            <select className="form-select" value={form.fipe_year_code} onChange={(e) => setForm({ ...form, fipe_year_code: e.target.value })} disabled={!form.fipe_model_id}>
+          <div className="field">
+            <label className="field-label"><Icon name="calendar" size={14} />Ano/combustível</label>
+            <select className="select" value={form.fipe_year_code} onChange={(e) => setForm({ ...form, fipe_year_code: e.target.value })} disabled={!form.fipe_model_id}>
               <option value="">Selecione</option>
               {years.map((y) => <option key={y.codigo} value={y.codigo}>{y.nome}</option>)}
             </select>
           </div>
-          <div className="col-md-6">
-            <label className="form-label"><i className="fa-solid fa-sack-dollar me-2" />Valor FIPE</label>
-            <input className="form-control" value={form.valor_fipe} readOnly />
+          <div className="field">
+            <label className="field-label"><Icon name="wallet" size={14} />Valor FIPE</label>
+            <input className="input" value={form.valor_fipe} readOnly />
           </div>
 
-          <div className="col-md-6">
-            <label className="form-label"><i className="fa-solid fa-image me-2" />Foto do veículo</label>
-            <input className="form-control" type="file" accept="image/*" onChange={handlePhotoChange} />
+          <div className="field">
+            <label className="field-label"><Icon name="image" size={14} />Foto do veículo</label>
+            <input className="input" type="file" accept="image/*" onChange={handlePhotoChange} />
             {selectedPhotoFile && (
-              <small className="text-muted d-block mt-1">
+              <p className="muted small">
                 Arquivo selecionado: {selectedPhotoFile.name}
-              </small>
+              </p>
             )}
           </div>
 
         </div>
-        <div className="mt-3 d-flex gap-2">
+        <div className="form-actions">
           <button type="submit" className="btn btn-primary" disabled={submitting}>
-            {submitting ? <><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />Salvando...</> : <><i className="fa-solid fa-floppy-disk me-2" />Salvar veículo</>}
+            {submitting ? <><ButtonSpinner />Salvando...</> : <><Icon name="save" size={16} />Salvar veículo</>}
           </button>
           {form.id && (
             <button
               type="button"
-              className="btn btn-outline-secondary"
+              className="btn btn-ghost"
               onClick={() => {
                 setForm(emptyForm)
                 setSelectedPhotoFile(null)
               }}
             >
-              <i className="fa-solid fa-xmark me-2" />Cancelar edição
+              <Icon name="x" size={16} />Cancelar edição
             </button>
           )}
         </div>

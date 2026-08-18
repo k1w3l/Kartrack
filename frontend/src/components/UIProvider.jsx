@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import Modal from './Modal'
+import Icon from './Icon'
 
 const UIContext = createContext(null)
 
@@ -10,10 +11,10 @@ export function useUI() {
 }
 
 const TOAST_ICONS = {
-  success: 'fa-solid fa-circle-check',
-  error: 'fa-solid fa-circle-exclamation',
-  warning: 'fa-solid fa-triangle-exclamation',
-  info: 'fa-solid fa-circle-info',
+  success: 'circleCheck',
+  error: 'circleAlert',
+  warning: 'triangleAlert',
+  info: 'info',
 }
 
 export function UIProvider({ children }) {
@@ -49,7 +50,7 @@ export function UIProvider({ children }) {
     setDialog({
       kind: 'confirm',
       title: options.title || 'Confirmar',
-      titleIcon: options.titleIcon || (options.danger ? 'fa-solid fa-triangle-exclamation' : 'fa-solid fa-circle-question'),
+      titleIcon: options.titleIcon || (options.danger ? 'triangleAlert' : 'circleHelp'),
       message: options.message || '',
       confirmLabel: options.confirmLabel || 'Confirmar',
       cancelLabel: options.cancelLabel || 'Cancelar',
@@ -65,7 +66,7 @@ export function UIProvider({ children }) {
     setDialog({
       kind: 'prompt',
       title: options.title || 'Informe um valor',
-      titleIcon: options.titleIcon || 'fa-solid fa-keyboard',
+      titleIcon: options.titleIcon || 'keyboard',
       message: options.message || '',
       label: options.label || '',
       placeholder: options.placeholder || '',
@@ -103,10 +104,10 @@ export function UIProvider({ children }) {
       <div className="toast-stack" aria-live="polite" aria-atomic="false">
         {toasts.map((item) => (
           <div key={item.id} className={`app-toast app-toast-${item.type}`} role={item.type === 'error' ? 'alert' : 'status'}>
-            <i className={`${TOAST_ICONS[item.type] || TOAST_ICONS.info} app-toast-icon`} />
+            <Icon name={TOAST_ICONS[item.type] || TOAST_ICONS.info} className="app-toast-icon" size={18} />
             <span className="app-toast-message">{item.message}</span>
-            <button type="button" className="btn btn-sm app-toast-close" onClick={() => dismiss(item.id)} aria-label="Fechar aviso">
-              <i className="fa-solid fa-xmark" />
+            <button type="button" className="app-toast-close" onClick={() => dismiss(item.id)} aria-label="Fechar aviso">
+              <Icon name="x" size={16} />
             </button>
           </div>
         ))}
@@ -120,7 +121,7 @@ export function UIProvider({ children }) {
         width="min(460px, 92vw)"
         footer={(
           <>
-            <button type="button" className="btn btn-outline-secondary" disabled={busy} onClick={() => closeDialog(isPrompt ? null : false)}>
+            <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => closeDialog(isPrompt ? null : false)}>
               {dialog?.cancelLabel || 'Cancelar'}
             </button>
             <button
@@ -134,15 +135,15 @@ export function UIProvider({ children }) {
           </>
         )}
       >
-        {dialog?.message && <p className="mb-2">{dialog.message}</p>}
+        {dialog?.message && <p style={{ marginBottom: 8 }}>{dialog.message}</p>}
         {isPrompt && (
           <>
-            {dialog.label && <label className="form-label" htmlFor="ui-prompt-input">{dialog.label}</label>}
-            <div className="input-group">
+            {dialog.label && <label className="field-label" htmlFor="ui-prompt-input">{dialog.label}</label>}
+            <div className="input-row">
               <input
                 id="ui-prompt-input"
                 ref={inputRef}
-                className="form-control"
+                className="input"
                 type={showPromptValue ? 'text' : dialog.inputType}
                 value={promptValue}
                 placeholder={dialog.placeholder}
@@ -155,12 +156,12 @@ export function UIProvider({ children }) {
                 }}
               />
               {dialog.inputType === 'password' && (
-                <button type="button" className="btn btn-outline-secondary" onClick={() => setShowPromptValue((v) => !v)} aria-label={showPromptValue ? 'Ocultar' : 'Mostrar'}>
-                  <i className={`fa-solid ${showPromptValue ? 'fa-eye-slash' : 'fa-eye'}`} />
+                <button type="button" className="btn btn-ghost icon-btn" onClick={() => setShowPromptValue((v) => !v)} aria-label={showPromptValue ? 'Ocultar' : 'Mostrar'}>
+                  <Icon name={showPromptValue ? 'eyeOff' : 'eye'} />
                 </button>
               )}
             </div>
-            {dialog.minLength ? <small className="text-muted d-block mt-1">Mínimo de {dialog.minLength} caracteres.</small> : null}
+            {dialog.minLength ? <p className="muted small" style={{ marginTop: 8 }}>Mínimo de {dialog.minLength} caracteres.</p> : null}
           </>
         )}
       </Modal>

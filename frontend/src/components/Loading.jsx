@@ -1,5 +1,4 @@
-// Componentes de carregamento reutilizáveis: spinner do sistema e skeletons
-// animados (shimmer) para a timeline enquanto os dados são buscados.
+import Icon from './Icon'
 
 export function Spinner({ label = 'Carregando...', className = '' }) {
   return (
@@ -12,19 +11,28 @@ export function Spinner({ label = 'Carregando...', className = '' }) {
 
 export function TimelineSkeleton({ rows = 4 }) {
   return (
-    <div className="d-flex flex-column gap-3 mt-3" aria-hidden="true">
+    <div className="timeline-log" aria-hidden="true">
       {Array.from({ length: rows }).map((_, i) => (
-        <div className="timeline-item skeleton-item" key={i} style={{ animationDelay: `${i * 60}ms` }}>
-          <div className="timeline-top-row">
-            <div className="d-flex align-items-center gap-2 flex-grow-1">
+        <div className="timeline-item" key={i} style={{ animationDelay: `${i * 60}ms` }}>
+          <div className="timeline-rail" />
+          <div>
+            <div className="cluster">
               <span className="skeleton skeleton-circle" />
               <span className="skeleton skeleton-line" style={{ width: '38%' }} />
+              <span className="skeleton skeleton-line" style={{ width: '90px', marginLeft: 'auto' }} />
             </div>
-            <span className="skeleton skeleton-line" style={{ width: '90px' }} />
+            <span className="skeleton skeleton-line" style={{ width: '64%', marginTop: 8 }} />
           </div>
-          <span className="skeleton skeleton-line mt-2" style={{ width: '64%' }} />
         </div>
       ))}
     </div>
   )
+}
+
+export function ButtonSpinner() {
+  return <span className="btn-spinner" aria-hidden="true" />
+}
+
+export function EmptyIcon({ name = 'chart' }) {
+  return <Icon name={name} size={28} />
 }

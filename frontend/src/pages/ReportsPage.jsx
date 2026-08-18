@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Bar, Line } from 'react-chartjs-2'
 import { BarElement, CategoryScale, Chart as ChartJS, Legend, LinearScale, LineElement, PointElement, Tooltip } from 'chart.js'
 import api from '../api'
+import Icon from '../components/Icon'
 
 ChartJS.register(BarElement, Tooltip, Legend, CategoryScale, LinearScale, LineElement, PointElement)
 
@@ -13,12 +14,12 @@ const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia
 
 function getChartTheme(darkMode) {
   return {
-    text: darkMode ? '#e5e7eb' : '#0f172a',
-    grid: darkMode ? 'rgba(148, 163, 184, 0.18)' : 'rgba(15, 23, 42, 0.08)',
-    blue: darkMode ? '#60a5fa' : '#2563eb',
-    green: darkMode ? '#4ade80' : '#16a34a',
-    amber: darkMode ? '#fbbf24' : '#f59e0b',
-    purple: darkMode ? '#c4b5fd' : '#7c3aed',
+    text: darkMode ? '#e7e8ea' : '#0f172a',
+    grid: darkMode ? 'rgba(160, 167, 178, 0.16)' : 'rgba(15, 23, 42, 0.08)',
+    blue: darkMode ? '#9184d9' : '#796cbf',
+    green: darkMode ? '#3ddc97' : '#1a8a58',
+    amber: darkMode ? '#b5abfc' : '#796cbf',
+    purple: darkMode ? '#9aa1ab' : '#5b6470',
   }
 }
 
@@ -42,8 +43,8 @@ function buildChartOptions(theme, extra = {}) {
 
 function ChartEmptyState({ message }) {
   return (
-    <div className="d-flex flex-column align-items-center justify-content-center text-muted py-4" style={{ minHeight: 180 }}>
-      <i className="fa-solid fa-chart-simple fa-xl mb-2" />
+    <div className="chart-empty" style={{ minHeight: 180 }}>
+      <Icon name="chart" size={28} />
       <span>{message}</span>
     </div>
   )
@@ -166,7 +167,7 @@ export default function ReportsPage({ vehicleId, darkMode }) {
     const w = window.open('', '_blank')
     if (!w) return
     w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8" /><title>Relatórios Kartrack</title><style>
-      body { font-family: Inter, system-ui, sans-serif; color: #0f172a; margin: 24px; }
+      body { font-family: Chivo, system-ui, sans-serif; color: #0f172a; margin: 24px; }
       h4, h5, h6 { margin: 0 0 8px; }
       .card { border: 1px solid #dbe2ee; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: none; }
       ul { margin: 0; padding-left: 18px; }
@@ -181,29 +182,29 @@ export default function ReportsPage({ vehicleId, darkMode }) {
   if (!vehicleId) return <div className="alert alert-info">Cadastre um veículo para visualizar relatórios.</div>
 
   return (
-    <div className="d-flex flex-column gap-3" id="reports-print-area">
-      <div className="card card-body">
-        <h5><i className="fa-solid fa-filter me-2" />Filtro de período</h5>
-        <div className="d-flex flex-wrap gap-2 mt-2">
-          <select className="form-select reports-period-select" value={periodMode} onChange={(e) => setPeriodMode(e.target.value)}>
+    <div className="stack-lg" id="reports-print-area">
+      <div className="card">
+        <h2 className="section-title"><Icon name="filter" size={16} />Filtro de período</h2>
+        <div className="cluster">
+          <select className="select" value={periodMode} onChange={(e) => setPeriodMode(e.target.value)}>
             <option value="mes">Mês/ano</option><option value="periodo">Período</option><option value="historico">Histórico completo</option>
           </select>
-          {periodMode === 'mes' && (<><select className="form-select" style={{ maxWidth: 140 }} value={month} onChange={(e) => setMonth(e.target.value)}>{Array.from({ length: 12 }).map((_, i) => { const m = String(i + 1).padStart(2, '0'); return <option key={m} value={m}>{m}</option> })}</select><select className="form-select" style={{ maxWidth: 140 }} value={year} onChange={(e) => setYear(e.target.value)}>{Array.from({ length: 8 }).map((_, i) => { const y = String(new Date().getFullYear() - i); return <option key={y} value={y}>{y}</option> })}</select></>)}
-          {periodMode === 'periodo' && (<><input className="form-control" style={{ maxWidth: 180 }} type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} /><input className="form-control" style={{ maxWidth: 180 }} type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} /></>)}
-          <button type="button" className="btn btn-outline-dark ms-auto" onClick={exportPdf}><i className="fa-solid fa-file-pdf me-2" />Exportar PDF</button>
+          {periodMode === 'mes' && (<><select className="select" style={{ maxWidth: 140 }} value={month} onChange={(e) => setMonth(e.target.value)}>{Array.from({ length: 12 }).map((_, i) => { const m = String(i + 1).padStart(2, '0'); return <option key={m} value={m}>{m}</option> })}</select><select className="select" style={{ maxWidth: 140 }} value={year} onChange={(e) => setYear(e.target.value)}>{Array.from({ length: 8 }).map((_, i) => { const y = String(new Date().getFullYear() - i); return <option key={y} value={y}>{y}</option> })}</select></>)}
+          {periodMode === 'periodo' && (<><input className="input" style={{ maxWidth: 180 }} type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} /><input className="input" style={{ maxWidth: 180 }} type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} /></>)}
+          <button type="button" className="btn btn-ghost" onClick={exportPdf}><Icon name="fileDown" size={16} />Exportar PDF</button>
         </div>
       </div>
 
-      <div className="row g-3">
-        <div className="col-xl-6"><div className="card card-body h-100"><h5><i className="fa-solid fa-gas-pump me-2" />Relatório de abastecimento</h5><ul className="mb-0"><li><strong>Melhor média:</strong> {fuelStats.melhorMedia.toFixed(2)} km/l</li><li><strong>Pior média:</strong> {fuelStats.piorMedia.toFixed(2)} km/l</li><li><strong>Melhor combustível (valor x média):</strong> {fuelStats.melhorCombustivel}</li></ul></div></div>
-        <div className="col-xl-6"><div className="card card-body h-100"><h5><i className="fa-solid fa-receipt me-2" />Relatório de despesas por tipo</h5>{Object.keys(expenseByType).length ? <ul className="mb-0">{Object.entries(expenseByType).sort((a, b) => b[1] - a[1]).map(([tipo, total]) => <li key={tipo}><strong>{tipo}:</strong> R$ {Number(total || 0).toFixed(2)}</li>)}</ul> : <p className="text-muted mb-0">Não há despesas no período selecionado.</p>}</div></div>
+      <div className="grid-2">
+        <div className="card"><h2 className="section-title"><Icon name="fuel" size={16} />Relatório de abastecimento</h2><ul><li><strong>Melhor média:</strong> {fuelStats.melhorMedia.toFixed(2)} km/l</li><li><strong>Pior média:</strong> {fuelStats.piorMedia.toFixed(2)} km/l</li><li><strong>Melhor combustível (valor x média):</strong> {fuelStats.melhorCombustivel}</li></ul></div>
+        <div className="card"><h2 className="section-title"><Icon name="receipt" size={16} />Relatório de despesas por tipo</h2>{Object.keys(expenseByType).length ? <ul>{Object.entries(expenseByType).sort((a, b) => b[1] - a[1]).map(([tipo, total]) => <li key={tipo}><strong>{tipo}:</strong> R$ {Number(total || 0).toFixed(2)}</li>)}</ul> : <p className="muted">Não há despesas no período selecionado.</p>}</div>
       </div>
 
       {periodMode !== 'mes' && (
-        <div className="card card-body">
-          <h5><i className="fa-solid fa-chart-line me-2" />Médias por mês</h5>
+        <div className="card">
+          <h2 className="section-title"><Icon name="lineChart" size={16} />Médias por mês</h2>
           {Object.keys(mediasPorMes).length > 1 ? (
-            <div style={{ height: 300 }}>
+            <div className="chart-box">
               <Line data={{ labels: Object.keys(mediasPorMes), datasets: [{ label: 'Média km/l', data: Object.values(mediasPorMes), borderColor: theme.blue, backgroundColor: theme.blue, tension: 0.25 }] }} options={buildChartOptions(theme)} />
             </div>
           ) : <ChartEmptyState message="Sem dados suficientes de consumo no período." />}
@@ -211,10 +212,10 @@ export default function ReportsPage({ vehicleId, darkMode }) {
       )}
 
       {periodMode === 'mes' && (
-        <div className="card card-body">
-          <h5><i className="fa-solid fa-chart-column me-2" />Abastecimentos do mês</h5>
+        <div className="card">
+          <h2 className="section-title"><Icon name="barChart" size={16} />Abastecimentos do mês</h2>
           {abastecimentosMes.labels.length ? (
-            <div style={{ height: 300 }}>
+            <div className="chart-box">
               <Line data={{ labels: abastecimentosMes.labels, datasets: [{ label: 'Valor (R$)', data: abastecimentosMes.valor, borderColor: theme.green, backgroundColor: theme.green, tension: 0.25 }, { label: 'Média (km/l)', data: abastecimentosMes.media, borderColor: theme.blue, backgroundColor: theme.blue, tension: 0.25 }] }} options={buildChartOptions(theme)} />
             </div>
           ) : <ChartEmptyState message="Sem abastecimentos no mês selecionado." />}
@@ -222,18 +223,18 @@ export default function ReportsPage({ vehicleId, darkMode }) {
       )}
 
       {fipeVariacao.labels.length > 1 && (
-        <div className="card card-body">
-          <h5><i className="fa-solid fa-chart-line me-2" />Variação mensal da FIPE</h5>
-          <div style={{ height: 300 }}>
+        <div className="card">
+          <h2 className="section-title"><Icon name="lineChart" size={16} />Variação mensal da FIPE</h2>
+          <div className="chart-box">
             <Line data={{ labels: fipeVariacao.labels, datasets: [{ label: 'Variação mensal (R$)', data: fipeVariacao.valores, borderColor: theme.amber, backgroundColor: theme.amber, tension: 0.25 }] }} options={buildChartOptions(theme)} />
           </div>
         </div>
       )}
 
-      <div className="card card-body">
-        <h5><i className="fa-solid fa-scale-balanced me-2" />Comparativo</h5>
+      <div className="card">
+        <h2 className="section-title"><Icon name="scale" size={16} />Comparativo</h2>
         {fuelRecordsWithoutFirst.length || expenseRecords.length ? (
-          <div style={{ height: 300 }}>
+          <div className="chart-box">
             <Bar
               data={{ labels: ['Abastecimentos', 'Despesas'], datasets: [{ label: 'Total (R$)', data: [fuelRecordsWithoutFirst.reduce((s, i) => s + Number(i.valor || 0), 0), expenseRecords.filter((i) => i.tipo_registro !== 'fipe').reduce((s, i) => s + Number(i.valor || 0), 0)], backgroundColor: [theme.blue, theme.purple], borderRadius: 10 }] }}
               options={buildChartOptions(theme, { plugins: { legend: { display: false } } })}
