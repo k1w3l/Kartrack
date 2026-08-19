@@ -263,7 +263,7 @@ label.btn {
   margin-top: var(--space-3);
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 1199.98px) {
   .form-actions {
     position: sticky;
     bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom, 0px));

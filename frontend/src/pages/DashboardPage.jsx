@@ -105,42 +105,6 @@ function buildTimelineDescription(item) {
   return joinFilled([formatDateBR(item.data), item.local, item.descricao])
 }
 
-function buildHoverDetails(item) {
-  const tipo = String(item.tipo_registro || '').toLowerCase()
-  if (tipo.includes('manutenção')) {
-    const details = parseMaintenanceDescription(item.descricao)
-    return [
-      item.local && `Oficina: ${item.local}`,
-      details.pecas.length ? `Peças: ${details.pecas.map((p) => `${p.nome} (${compactCurrency(p.valor)})`).join(', ')}` : '',
-      details.servicos.length ? `Serviços: ${details.servicos.map((s) => `${s.nome} (${compactCurrency(s.valor)})`).join(', ')}` : '',
-      details.valorPecas ? `Valor peças: ${compactCurrency(details.valorPecas)}` : '',
-      details.valorServicos ? `Valor serviços: ${compactCurrency(details.valorServicos)}` : '',
-      details.descricaoServico && details.descricaoServico !== '-' ? `Descrição: ${details.descricaoServico}` : '',
-      `Total: ${compactCurrency(item.valor)}`,
-    ].filter(Boolean)
-  }
-  if (tipo.includes('abastecimento')) {
-    return [
-      item.bandeira ? `Bandeira: ${item.bandeira}` : '',
-      item.tipo_combustivel ? `Tipo de combustível: ${item.tipo_combustivel}` : '',
-      Number.isFinite(Number(item.litros)) ? `Litros abastecidos: ${Number(item.litros).toFixed(2)} L` : '',
-      Number.isFinite(Number(item.valor_litro)) ? `Valor do litro: ${compactCurrency(item.valor_litro)}` : '',
-      `Valor total: ${compactCurrency(item.valor)}`,
-      Number.isFinite(Number(item.consumo_km_l)) ? `Média: ${Number(item.consumo_km_l).toFixed(2)} km/l` : '',
-      item.observacao ? `Descrição: ${item.observacao}` : '',
-    ].filter(Boolean)
-  }
-  if (tipo.includes('fipe')) {
-    return [
-      `Valor de referência: ${compactCurrency(item.valor)}`,
-      item.fipe_referencia ? `Tabela: ${item.fipe_referencia}` : '',
-      item.local ? `Veículo: ${item.local}` : '',
-    ].filter(Boolean)
-  }
-
-  return [item.local, item.descricao, `Total: ${compactCurrency(item.valor)}`].filter(Boolean)
-}
-
 function buildFieldRows(record, timelineItem) {
   const fields = [
     ['Tipo', formatTipoRegistro(timelineItem.tipo_registro)],
@@ -196,7 +160,8 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
   const [pageSize, setPageSize] = useState(10)
   const [filtersHydrated, setFiltersHydrated] = useState(false)
   const [detailModal, setDetailModal] = useState(null)
-  const [expandedIds, setExpandedIds] = useState([])
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [menuKey, setMenuKey] = useState(null)
   const printAreaRef = useRef(null)
 
   const load = async () => {
@@ -372,6 +337,7 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
   }
 
   const exportTimelinePdf = () => {
+    setFilterOpen(false)
     const content = printAreaRef.current?.innerHTML
     if (!content) return
     const w = window.open('', '_blank')
@@ -380,7 +346,8 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
       body { font-family: Chivo, system-ui, sans-serif; color: #1a1814; margin: 24px; }
       .section-title { font-size: 16px; margin: 0 0 12px; font-weight: 700; }
       .timeline-item { border-bottom: 1px solid #d6cfc2; padding: 10px 0; }
-      .timeline-actions, .timeline-details, button, .btn { display: none !important; }
+      .timeline-overflow, .timeline-menu, .timeline-pager { display: none !important; }
+      .timeline-hit { display: block !important; border: 0; background: transparent; padding: 0; text-align: left; color: inherit; }
       .muted { color: #6f675c; }
       .num, .timeline-valor { font-family: "Chivo Mono", monospace; }
     </style></head><body>${content}</body></html>`)
@@ -389,12 +356,39 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
     setTimeout(() => w.print(), 250)
   }
 
+  const filterCount = Number(periodMode !== 'historico') + Number(Boolean(String(search).trim())) + Number(tipoFiltro !== 'todos')
+  const filterSummary = joinFilled([
+    periodMode === 'historico' ? 'Histórico' : periodMode === 'mes' ? `${month}/${year}` : (fromDate && toDate ? `${formatDateBR(fromDate)} – ${formatDateBR(toDate)}` : 'Período'),
+    tipoFiltro === 'todos' ? 'Todos os tipos' : formatTipoRegistro(tipoFiltro),
+    String(search).trim() ? `“${String(search).trim()}”` : '',
+  ])
+
+  useEffect(() => {
+    if (!filterOpen && !menuKey) return undefined
+    const onKey = (event) => {
+      if (event.key === 'Escape') {
+        setFilterOpen(false)
+        setMenuKey(null)
+      }
+    }
+    const onPointer = (event) => {
+      if (menuKey && !event.target.closest?.('.timeline-overflow')) setMenuKey(null)
+    }
+    document.addEventListener('keydown', onKey)
+    document.addEventListener('mousedown', onPointer)
+    const previousOverflow = document.body.style.overflow
+    if (filterOpen) document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('mousedown', onPointer)
+      document.body.style.overflow = previousOverflow
+    }
+  }, [filterOpen, menuKey])
+
   if (!vehicleId) return <div className="alert alert-info">Cadastre um veículo em "Meu veículo".</div>
   if (loading && !dashboard) return <Spinner label="Carregando dados do veículo..." />
 
-  const toggleExpanded = (key) => {
-    setExpandedIds((prev) => prev.includes(key) ? prev.filter((id) => id !== key) : [...prev, key])
-  }
+  const tipoOptions = [...new Set(timeline.map((i) => i.tipo_registro))]
 
   return (
     <div className="stack-lg">
@@ -416,46 +410,23 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
           </div>
         </div>
 
-        <div className="timeline-filters">
-          <input
-            className="input timeline-search"
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Pesquisar"
-            aria-label="Pesquisar registros da timeline"
-          />
-          <select className="select" value={periodMode} onChange={(e) => setPeriodMode(e.target.value)}>
-            <option value="mes">Mês/ano</option>
-            <option value="periodo">Período</option>
-            <option value="historico">Histórico completo</option>
-          </select>
-          {periodMode === 'mes' && (
-            <>
-              <select className="select" value={month} onChange={(e) => setMonth(e.target.value)}>{Array.from({ length: 12 }).map((_, i) => { const m = String(i + 1).padStart(2, '0'); return <option key={m} value={m}>{m}</option> })}</select>
-              <select className="select" value={year} onChange={(e) => setYear(e.target.value)}>{Array.from({ length: 8 }).map((_, i) => { const y = String(now.getFullYear() - i); return <option key={y} value={y}>{y}</option> })}</select>
-            </>
-          )}
-          {periodMode === 'periodo' && (
-            <>
-              <input className="input" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-              <input className="input" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
-            </>
-          )}
-          <select className="select" value={tipoFiltro} onChange={(e) => { setTipoFiltro(e.target.value); setPage(1) }}>
-            <option value="todos">Todos os tipos</option>
-            {[...new Set(timeline.map((i) => i.tipo_registro))].map((tipo) => <option key={tipo} value={tipo}>{formatTipoRegistro(tipo)}</option>)}
-          </select>
-          <select className="select" value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1) }}>
-            <option value={10}>10 por página</option>
-            <option value={25}>25 por página</option>
-            <option value={50}>50 por página</option>
-          </select>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={exportTimelinePdf}><Icon name="fileDown" size={16} />PDF</button>
+        <div className="timeline-toolbar">
+          <button
+            type="button"
+            className="btn btn-primary"
+            aria-expanded={filterOpen}
+            aria-haspopup="dialog"
+            onClick={() => setFilterOpen(true)}
+          >
+            <Icon name="filter" size={16} />
+            Filtrar
+            {filterCount > 0 ? <span className="filter-count">{filterCount}</span> : null}
+          </button>
+          <p className="muted small timeline-toolbar-summary">{filterSummary}</p>
         </div>
       </div>
 
-      <div className="metric-grid">
+      <div className="metric-grid" role="list">
         <MetricCard icon="wallet" title="Despesas" value={brl.format(metricas.totalDespesas)} />
         <MetricCard icon="fuel" title="Abastecimentos" value={brl.format(metricas.totalAbastecimentos)} />
         <MetricCard icon="banknote" title="Custo total" value={brl.format(metricas.custoTotal)} />
@@ -470,36 +441,44 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
           <div className="timeline-log">
             {paginatedTimeline.map((item, idx) => {
               const key = `${item.tipo_registro}-${item.id}`
-              const details = buildHoverDetails(item)
-              const expanded = expandedIds.includes(key)
+              const menuOpen = menuKey === key
+              const kmLabel = item.quilometragem ? `${item.quilometragem} km` : ''
               return (
                 <div className={`timeline-item ${timelineTone(item.tipo_registro)}`} key={key} style={{ animationDelay: `${Math.min(idx, 8) * 45}ms` }}>
-                  <div className="timeline-rail" />
-                  <div>
-                    <div className="timeline-top">
-                      <div className="timeline-main">
-                        <strong className="cluster"><Icon name={recordIconName(item.tipo_registro)} size={16} />{formatTipoRegistro(item.tipo_registro)}</strong>
-                        {item.tipo_registro === 'abastecimento' && item.consumo_km_l !== null && item.consumo_km_l !== undefined ? (
-                          <span className="timeline-consumo">{item.consumo_km_l} km/l</span>
-                        ) : null}
-                        <span className="timeline-valor">{brl.format(item.valor)}</span>
-                      </div>
-                      <div className="timeline-actions">
-                        {!!details.length && (
-                          <button type="button" className="btn btn-ghost btn-sm icon-btn" title={expanded ? 'Ocultar detalhes' : 'Ver detalhes'} onClick={() => toggleExpanded(key)}>
-                            <Icon name="info" size={16} />
-                          </button>
-                        )}
-                        <button type="button" className="btn btn-ghost btn-sm icon-btn" title="Visualizar" onClick={() => viewRecord(item)}><Icon name="eye" size={16} /></button>
-                        <button type="button" className="btn btn-ghost btn-sm icon-btn" title="Clonar" onClick={() => cloneRecord(item)}><Icon name="copy" size={16} /></button>
-                        <button type="button" className="btn btn-accent btn-sm icon-btn" title="Editar" onClick={() => editRecord(item)}><Icon name="squarePen" size={16} /></button>
-                        <button type="button" className="btn btn-danger btn-sm icon-btn" title="Excluir" onClick={() => deleteRecord(item)}><Icon name="trash" size={16} /></button>
-                      </div>
+                  <div className="timeline-rail" aria-hidden="true" />
+                  <button type="button" className="timeline-hit" onClick={() => viewRecord(item)}>
+                    <div className="timeline-main">
+                      <strong className="cluster"><Icon name={recordIconName(item.tipo_registro)} size={16} />{formatTipoRegistro(item.tipo_registro)}</strong>
+                      {kmLabel ? <span className="num">{kmLabel}</span> : null}
+                      {item.tipo_registro === 'abastecimento' && item.consumo_km_l !== null && item.consumo_km_l !== undefined ? (
+                        <span className="timeline-consumo">{item.consumo_km_l} km/l</span>
+                      ) : null}
+                      <span className="timeline-valor">{brl.format(item.valor)}</span>
                     </div>
                     <p className="muted small">{buildTimelineDescription(item)}</p>
-                    {!!details.length && (
-                      <div className="timeline-details" hidden={!expanded}>
-                        {details.map((detail, di) => <div key={`${item.id}-${di}`}>{detail}</div>)}
+                  </button>
+                  <div className="timeline-overflow">
+                    <button
+                      type="button"
+                      className="btn btn-ghost icon-btn"
+                      aria-label="Mais ações"
+                      aria-haspopup="menu"
+                      aria-expanded={menuOpen}
+                      onClick={() => setMenuKey(menuOpen ? null : key)}
+                    >
+                      <Icon name="moreVertical" size={18} />
+                    </button>
+                    {menuOpen && (
+                      <div className="timeline-menu card" role="menu">
+                        <button type="button" className="dropdown-item" role="menuitem" onClick={() => { setMenuKey(null); cloneRecord(item) }}>
+                          <Icon name="copy" size={16} />Clonar
+                        </button>
+                        <button type="button" className="dropdown-item" role="menuitem" onClick={() => { setMenuKey(null); editRecord(item) }}>
+                          <Icon name="squarePen" size={16} />Editar
+                        </button>
+                        <button type="button" className="dropdown-item is-danger" role="menuitem" onClick={() => { setMenuKey(null); deleteRecord(item) }}>
+                          <Icon name="trash" size={16} />Excluir
+                        </button>
                       </div>
                     )}
                   </div>
@@ -510,7 +489,7 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
           </div>
         )}
         {!!timelineExibida.length && (
-          <div className="cluster cluster-spread" style={{ marginTop: 16 }}>
+          <div className="cluster cluster-spread timeline-pager">
             <p className="muted small">Página {page} de {totalPages}</p>
             <div className="cluster">
               <button type="button" className="btn btn-ghost btn-sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Anterior</button>
@@ -519,6 +498,87 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
           </div>
         )}
       </div>
+
+      {filterOpen && (
+        <div
+          className="filter-overlay"
+          onMouseDown={(event) => { if (event.target === event.currentTarget) setFilterOpen(false) }}
+        >
+          <div className="filter-sheet" role="dialog" aria-modal="true" aria-labelledby="filter-sheet-title">
+            <div className="modal-head">
+              <h2 id="filter-sheet-title" className="section-title" style={{ marginBottom: 0 }}>
+                <Icon name="filter" size={18} />Filtros
+              </h2>
+              <button type="button" className="btn btn-ghost icon-btn" onClick={() => setFilterOpen(false)} aria-label="Fechar">
+                <Icon name="x" />
+              </button>
+            </div>
+            <div className="stack">
+              <label className="field">
+                <span className="field-label">Pesquisar</span>
+                <input
+                  className="input"
+                  type="search"
+                  value={search}
+                  onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+                  placeholder="Texto, posto, valor…"
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Período</span>
+                <select className="select" value={periodMode} onChange={(e) => setPeriodMode(e.target.value)}>
+                  <option value="mes">Mês/ano</option>
+                  <option value="periodo">Período</option>
+                  <option value="historico">Histórico completo</option>
+                </select>
+              </label>
+              {periodMode === 'mes' && (
+                <div className="cluster">
+                  <label className="field grow">
+                    <span className="field-label">Mês</span>
+                    <select className="select" value={month} onChange={(e) => setMonth(e.target.value)}>{Array.from({ length: 12 }).map((_, i) => { const m = String(i + 1).padStart(2, '0'); return <option key={m} value={m}>{m}</option> })}</select>
+                  </label>
+                  <label className="field grow">
+                    <span className="field-label">Ano</span>
+                    <select className="select" value={year} onChange={(e) => setYear(e.target.value)}>{Array.from({ length: 8 }).map((_, i) => { const y = String(now.getFullYear() - i); return <option key={y} value={y}>{y}</option> })}</select>
+                  </label>
+                </div>
+              )}
+              {periodMode === 'periodo' && (
+                <div className="cluster">
+                  <label className="field grow">
+                    <span className="field-label">De</span>
+                    <input className="input" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+                  </label>
+                  <label className="field grow">
+                    <span className="field-label">Até</span>
+                    <input className="input" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+                  </label>
+                </div>
+              )}
+              <label className="field">
+                <span className="field-label">Tipo</span>
+                <select className="select" value={tipoFiltro} onChange={(e) => { setTipoFiltro(e.target.value); setPage(1) }}>
+                  <option value="todos">Todos os tipos</option>
+                  {tipoOptions.map((tipo) => <option key={tipo} value={tipo}>{formatTipoRegistro(tipo)}</option>)}
+                </select>
+              </label>
+              <label className="field">
+                <span className="field-label">Por página</span>
+                <select className="select" value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1) }}>
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                </select>
+              </label>
+            </div>
+            <div className="modal-foot">
+              <button type="button" className="btn btn-ghost" onClick={exportTimelinePdf}><Icon name="fileDown" size={16} />PDF</button>
+              <button type="button" className="btn btn-primary" onClick={() => setFilterOpen(false)}>Pronto</button>
+            </div>
+          </div>
+        </div>
+      )}
       <Modal
         open={Boolean(detailModal)}
         onClose={() => setDetailModal(null)}
@@ -552,7 +612,7 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
 
 function MetricCard({ icon, title, value }) {
   return (
-    <div className="metric-card">
+    <div className="metric-card" role="listitem">
       <div className="label"><Icon name={icon} size={14} />{title}</div>
       <div className="value">{value}</div>
     </div>

@@ -1,0 +1,75 @@
+{
+  "buildPath": "comp",
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-color",
+        "value": "#fff",
+        "createdAt": "2026-08-19T05:39:26.369Z",
+        "reason": "Incumbent: texto sobre badge de perigo no sino; branco para contraste no vermelho, não é paleta de marca"
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "frontend/src/styles/components.css"
+        ],
+        "createdAt": "2026-08-19T05:39:26.392Z",
+        "reason": "Incumbent: faixa semântica à esquerda do toast (ok/danger/warning/info) documentada no sistema de elevação"
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "frontend/src/styles/pages.css"
+        ],
+        "createdAt": "2026-08-19T05:39:26.417Z",
+        "reason": "DESIGN.md: KPI com faixa esquerda Perfil 3px é a assinatura O Painel do Veículo"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "0.72rem",
+        "createdAt": "2026-08-19T05:40:07.141Z",
+        "reason": "DESIGN.md: label de KPI/tabela uppercase 0.72rem (The Tabular/Label hierarchy)"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "0.92rem",
+        "createdAt": "2026-08-19T05:40:07.169Z",
+        "reason": "Incumbent: corpo do toast, vizinho de --text-sm"
+      },
+      {
+        "rule": "design-system-radius",
+        "value": "8px",
+        "createdAt": "2026-08-19T05:40:07.192Z",
+        "reason": "Incumbent: skeleton entre radius-sm (6px) e radius (10px)"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#1a1814",
+        "createdAt": "2026-08-19T05:40:33.097Z",
+        "reason": "Print stylesheet da timeline (papel), não chrome da UI"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#d6cfc2",
+        "createdAt": "2026-08-19T05:40:33.124Z",
+        "reason": "Print stylesheet da timeline (papel), não chrome da UI"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#6f675c",
+        "createdAt": "2026-08-19T05:40:33.147Z",
+        "reason": "Print stylesheet da timeline (papel), não chrome da UI"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "1.6rem",
+        "createdAt": "2026-08-19T05:41:42.034Z",
+        "reason": "Incumbent: preço FIPE na tela de veículo, display vizinho do KPI"
+      }
+    ]
+  }
+}
