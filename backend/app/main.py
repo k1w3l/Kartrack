@@ -22,6 +22,7 @@ from .auth import create_access_token, get_current_user, get_password_hash, veri
 from .config import settings
 from .database import get_db, init_db
 from .models import ExpenseRecord, FuelRecord, LookupItem, User, Vehicle, VehicleFipeHistory
+from .spa_static import SPAStaticFiles
 from .schemas import (
     DashboardOut,
     ExpenseIn,
@@ -1263,4 +1264,4 @@ def _apply_restore(db, current_user, vehicles_payload, fuels_payload, expenses_p
 
 _frontend_dist = Path("frontend/dist")
 if _frontend_dist.exists():
-    app.mount("/", StaticFiles(directory=str(_frontend_dist), html=True), name="frontend")
+    app.mount("/", SPAStaticFiles(directory=str(_frontend_dist), html=True), name="frontend")

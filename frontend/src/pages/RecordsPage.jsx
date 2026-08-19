@@ -36,6 +36,7 @@ const EXPENSE_BULK_FIELDS = [
 const DATA_TYPE_FIELDS = [
   { key: 'fuel_type', label: 'Tipo de combustível', placeholder: 'Ex.: Gasolina Comum' },
   { key: 'fuel_brand', label: 'Bandeira', placeholder: 'Ex.: Ipiranga' },
+  { key: 'fuel_location', label: 'Locais de abastecimento', placeholder: 'Ex.: Avenida Central, 123', parentKey: 'fuel_brand', parentLabel: 'Bandeira' },
   { key: 'expense_multa_tipo', label: 'Tipo da multa', placeholder: 'Ex.: Rodízio' },
   { key: 'expense_seguradora', label: 'Seguradora', placeholder: 'Ex.: Tokio Marine' },
   { key: 'expense_oficina', label: 'Oficina', placeholder: 'Ex.: Oficina do João' },
@@ -211,11 +212,17 @@ export default function RecordsPage({ vehicleId }) {
     setSelectedIds((prev) => [...new Set([...prev, ...displayedIds])])
   }
 
-  const addDataTypeValue = async (key, value) => {
+  const addDataTypeValue = async (key, value, parentValue = '') => {
     const trimmed = String(value || '').trim()
     if (!trimmed) return null
+    const parent = String(parentValue || '').trim()
+    const field = DATA_TYPE_FIELDS.find((item) => item.key === key)
+    if (field?.parentKey && !parent) {
+      toast.error(`Selecione a ${String(field.parentLabel || 'opção').toLowerCase()}.`)
+      return null
+    }
     try {
-      const { data } = await api.post('/lookup', { category: key, value: trimmed })
+      const { data } = await api.post('/lookup', { category: key, value: trimmed, parent_value: parent })
       setDataTypes((prev) => ({ ...prev, [key]: [...(prev[key] || []), data] }))
       return data
     } catch {
@@ -228,7 +235,7 @@ export default function RecordsPage({ vehicleId }) {
     if (!item?.id) return
     const ok = await confirm({
       title: 'Excluir cadastro',
-      message: `Excluir "${item.value}" de ${label}? Esta ação não pode ser desfeita.`,
+      message: `Excluir "${item.parent_value ? `${item.parent_value} — ${item.value}` : item.value}" de ${label}? Esta ação não pode ser desfeita.`,
       confirmLabel: 'Excluir',
       danger: true,
     })
@@ -366,7 +373,8 @@ export default function RecordsPage({ vehicleId }) {
               key={field.key}
               field={field}
               values={dataTypes[field.key] || []}
-              onAdd={(v) => addDataTypeValue(field.key, v)}
+              parentOptions={field.parentKey ? (dataTypes[field.parentKey] || []) : []}
+              onAdd={(v, parent) => addDataTypeValue(field.key, v, parent)}
               onRemove={(item) => removeDataTypeValue(field.key, item, field.label)}
             />
           ))}
@@ -382,9 +390,10 @@ export default function RecordsPage({ vehicleId }) {
   )
 }
 
-function DataTypeEditor({ field, values, onAdd, onRemove }) {
+function DataTypeEditor({ field, values, parentOptions = [], onAdd, onRemove }) {
   const [newValue, setNewValue] = useState('')
   const [selectedId, setSelectedId] = useState('')
+  const [parentValue, setParentValue] = useState('')
 
   useEffect(() => {
     if (!values.some((item) => String(item.id) === String(selectedId))) {
@@ -393,9 +402,10 @@ function DataTypeEditor({ field, values, onAdd, onRemove }) {
   }, [values, selectedId])
 
   const selectedItem = values.find((item) => String(item.id) === String(selectedId))
+  const itemLabel = (item) => (item.parent_value ? `${item.parent_value} — ${item.value}` : item.value)
 
   const submitNewValue = async () => {
-    const created = await onAdd(newValue)
+    const created = await onAdd(newValue, parentValue)
     setNewValue('')
     if (created?.id) setSelectedId(String(created.id))
   }
@@ -413,7 +423,7 @@ function DataTypeEditor({ field, values, onAdd, onRemove }) {
         >
           {!values.length && <option value="">Nenhum item cadastrado</option>}
           {values.map((item) => (
-            <option key={item.id || item.value} value={item.id}>{item.value}</option>
+            <option key={item.id || item.value} value={item.id}>{itemLabel(item)}</option>
           ))}
         </select>
         <button
@@ -422,11 +432,24 @@ function DataTypeEditor({ field, values, onAdd, onRemove }) {
           disabled={!selectedItem}
           onClick={() => onRemove(selectedItem)}
           title="Excluir item selecionado"
-          aria-label={`Excluir ${selectedItem?.value || 'item'}`}
+          aria-label={`Excluir ${selectedItem ? itemLabel(selectedItem) : 'item'}`}
         >
           <Icon name="trash" size={16} />
         </button>
       </div>
+      {field.parentKey && (
+        <select
+          className="select"
+          value={parentValue}
+          onChange={(e) => setParentValue(e.target.value)}
+          aria-label={`Selecione a ${String(field.parentLabel || 'opção').toLowerCase()}`}
+        >
+          <option value="">{`Selecione a ${String(field.parentLabel || 'opção').toLowerCase()}`}</option>
+          {parentOptions.map((item) => (
+            <option key={item.id || item.value} value={item.value}>{item.value}</option>
+          ))}
+        </select>
+      )}
       <div className="inline-add">
         <input
           className="input"
