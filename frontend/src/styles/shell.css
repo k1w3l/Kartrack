@@ -199,8 +199,12 @@
 }
 
 .bottom-nav,
-.more-sheet,
-.rail-toggle {
+.more-sheet {
+  display: none;
+}
+
+/* .btn em components.css carrega depois e ganhava de .rail-toggle sozinho. */
+.btn.rail-toggle {
   display: none;
 }
 
@@ -211,8 +215,7 @@
     grid-template-rows: var(--header-h) minmax(0, 1fr);
   }
 
-  .app-rail,
-  .rail-toggle {
+  .app-rail {
     display: none;
   }
 
@@ -306,7 +309,7 @@
 }
 
 @media (min-width: 1200px) {
-  .rail-toggle {
+  .btn.rail-toggle {
     display: inline-flex;
   }
 }
