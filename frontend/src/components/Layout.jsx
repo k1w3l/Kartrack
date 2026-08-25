@@ -126,19 +126,21 @@ export default function Layout({
           </Link>
         </div>
 
+        {vehicles.length > 0 && (
+          <select
+            className="select vehicle-switcher"
+            value={vehicleId || ''}
+            onChange={(e) => onSelectVehicle?.(Number(e.target.value))}
+            aria-label="Veículo ativo"
+            title={vehicles.find((vehicle) => Number(vehicle.id) === Number(vehicleId))?.nome || 'Veículo ativo'}
+          >
+            {vehicles.map((vehicle) => (
+              <option key={vehicle.id} value={vehicle.id}>{vehicle.nome || vehicle.placa || `Veículo ${vehicle.id}`}</option>
+            ))}
+          </select>
+        )}
+
         <div className="header-right" ref={userMenuRef}>
-          {vehicles.length > 0 && (
-            <select
-              className="select vehicle-switcher"
-              value={vehicleId || ''}
-              onChange={(e) => onSelectVehicle?.(Number(e.target.value))}
-              aria-label="Veículo ativo"
-            >
-              {vehicles.map((vehicle) => (
-                <option key={vehicle.id} value={vehicle.id}>{vehicle.nome || vehicle.placa || `Veículo ${vehicle.id}`}</option>
-              ))}
-            </select>
-          )}
           <RemindersBell vehicleId={vehicleId} />
           <button type="button" className="btn btn-ghost icon-btn" onClick={onToggleTheme} aria-pressed={darkMode} title={darkMode ? 'Ativar tema claro' : 'Ativar tema escuro'}>
             <Icon name={darkMode ? 'sun' : 'moon'} />
@@ -148,7 +150,7 @@ export default function Layout({
           </button>
           {userMenuOpen && (
             <div className="user-menu card">
-              <div className="page-title" style={{ fontSize: '0.95rem', marginBottom: 8 }}>{user?.name || 'Usuário'}</div>
+              <div className="page-title" style={{ fontSize: 'var(--text-sm)', marginBottom: 8 }}>{user?.name || 'Usuário'}</div>
               <button className="dropdown-item" type="button" onClick={handleChangePassword}>
                 <Icon name="key" size={16} />Trocar senha
               </button>

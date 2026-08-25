@@ -53,7 +53,6 @@
   --danger: #e24b4a;
   --danger-dim: rgba(226, 75, 74, 0.16);
   --warning: #e0a14a;
-  --tick: rgba(181, 171, 252, 0.22);
   --skeleton-base: #2a2e35;
   --skeleton-highlight: #353a43;
   --overlay: rgba(10, 12, 14, 0.62);
@@ -76,7 +75,6 @@
   --danger: #c43332;
   --danger-dim: rgba(196, 51, 50, 0.12);
   --warning: #b56f08;
-  --tick: rgba(121, 108, 191, 0.22);
   --skeleton-base: #e3e7ec;
   --skeleton-highlight: #f8fafc;
   --overlay: rgba(15, 23, 42, 0.45);

@@ -2,7 +2,7 @@
   min-height: 100dvh;
   display: grid;
   grid-template-columns: var(--rail-w) minmax(0, 1fr);
-  grid-template-rows: var(--header-h) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   background:
     radial-gradient(1200px 420px at 0% 0%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 60%),
     var(--bg);
@@ -15,9 +15,9 @@
 
 .app-header {
   grid-column: 1 / -1;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-3);
   padding: 0 var(--space-4);
   border-bottom: 1px solid var(--border);
@@ -36,8 +36,14 @@
   min-width: 0;
 }
 
+.header-left {
+  grid-column: 1;
+}
+
 .header-right {
+  grid-column: 3;
   position: relative;
+  justify-self: end;
 }
 
 .logo-link {
@@ -54,8 +60,15 @@
 }
 
 .vehicle-switcher {
+  grid-column: 2;
   min-width: 0;
-  max-width: 220px;
+  max-width: 280px;
+  width: 100%;
+  justify-self: start;
+  padding-right: 2rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .notif-btn {
@@ -212,11 +225,19 @@
   .app-shell,
   .app-shell.is-collapsed {
     grid-template-columns: 1fr;
-    grid-template-rows: var(--header-h) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .app-rail {
     display: none;
+  }
+
+  .app-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+    height: auto;
+    row-gap: var(--space-2);
+    padding-block: var(--space-2);
   }
 
   .app-logo {
@@ -224,8 +245,20 @@
     height: 32px;
   }
 
+  .header-left {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .header-right {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
   .vehicle-switcher {
-    max-width: 180px;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    max-width: none;
   }
 
   .app-main {

@@ -137,7 +137,7 @@ O tema padrão é escuro (`color-scheme: dark`). Claro existe como remap dos mes
 - Dark-first; violeta Perfil raro e funcional
 - Chivo no UI, Chivo Mono em dinheiro / km / L / placa
 - Placas tonais com costura 1px; sombra só em overlay
-- Assinatura: KPI com trilho de ticks + faixa esquerda; timeline com trilho de tipo
+- Assinatura: KPI com faixa esquerda no acento; timeline com trilho de tipo
 - Alvo 44px; raio 10px em controle, 14px em placa
 
 ## Colors
@@ -160,7 +160,7 @@ Paleta de um acento só: cinza de produção como matéria, violeta Perfil como 
 - **Perigo** (`danger`): lembrete vermelho, exclusão, erro.
 - **Âmbar de aviso** (`warning-amber`): lembrete em aviso; nunca substitui o acento Perfil.
 
-**The Perfil Rule.** O violeta é ponteiro, não tinta. Cabe em ≤10% da tela. Fundo, placa e texto continuam cinza. Glow (`accent-glow`) e ticks (`tick`) são o violeta diluído — não um segundo accent.
+**The Perfil Rule.** O violeta é ponteiro, não tinta. Cabe em ≤10% da tela. Fundo, placa e texto continuam cinza. Glow (`accent-glow`) é o violeta diluído — não um segundo accent.
 
 **The Semantic-Is-Not-Brand Rule.** Verde, vermelho e âmbar narram estado. Não recolorir o chrome com eles.
 
@@ -183,7 +183,7 @@ Paleta de um acento só: cinza de produção como matéria, violeta Perfil como 
 
 ## Layout
 
-App shell em grid: header 56px de ponta a ponta; rail 232px (colapsado 72px) + main. Abaixo de 1200px o rail some, entra bottom nav 64px + safe-area, e o Mais abre sheet. Conteúdo com padding 16px; ações de formulário grudam acima da bottom nav no telefone.
+App shell em grid: header 56px de ponta a ponta (no telefone o seletor de veículo desce para uma segunda linha em largura total); rail 232px (colapsado 72px) + main. Abaixo de 1200px o rail some, entra bottom nav 64px + safe-area, e o Mais abre sheet. Conteúdo com padding 16px; ações de formulário grudam acima da bottom nav no telefone.
 
 Listas (Início, Registros, veículos, usuários): toque na linha = ação principal; ⋯ para o resto. Filtros e recortes extra em sheet **Filtrar** + faixa de KPI. Formulários: essenciais na página, cadastro novo no **+** do dropdown, não em link. Relatórios: período compacto no topo com PDF e depreciação; abas iguais.
 
@@ -193,13 +193,13 @@ Ritmo 4/8: 4, 8, 12, 16, 24, 32. Grids de conteúdo 1 col → 2 em 768px; métri
 
 ## Elevation & Depth
 
-Híbrido de instrumento: placas planas em repouso (tonalidade + costura). Sombra estrutural só quando algo sai do plano (modal, toast, overlay). Glow e ticks são profundidade de *estado*, não de marketing.
+Híbrido de instrumento: placas planas em repouso (tonalidade + costura). Sombra estrutural só quando algo sai do plano (modal, toast, overlay). Glow é profundidade de *estado*, não de marketing.
 
 ### Shadow Vocabulary
 - **Overlay** (`0 12px 32px rgba(0, 0, 0, 0.32)` no escuro; `0 10px 28px rgba(15, 23, 42, 0.1)` no claro): toast e modal.
 - **Focus glow** (`0 0 0 3px` no glow do acento): foco de campo e hover do primário.
 - **Active rail** (`0 0 0 1px` no glow): item de navegação corrente.
-- **Instrument tick / rail** (repeating 2px/5px no KPI; `0 0 10px` no pino da timeline): assinatura do cluster.
+- **Timeline pin** (`0 0 10px` no pino da timeline): assinatura do trilho.
 
 **The Cluster Glow Rule.** Card em repouso não tem drop shadow. Glow aparece em foco, ativo e no trilho de instrumento. Overlay é o único lugar da sombra grande.
 
@@ -243,7 +243,7 @@ Refinado e contido: 44px de alvo, primário sólido Perfil, ghost sem fundo, pre
 - **Mobile:** cinco destinos na base (Início, Abastecer, Despesa, Relatórios, Mais). Ativo em Perfil. Sheet sobe com os destinos de sistema.
 
 ### Metric card (assinatura)
-Placa 14px, faixa esquerda 3px Perfil, trilho de ticks 8px (`tick` 2px ligado / 5px desligado). Label uppercase tracked; valor em display mono. Isso é o cluster — telas novas que mostram um número-rei copiam esta peça, não um card genérico.
+Placa 14px, faixa esquerda 3px Perfil. Sem trilho de ticks. Ícone no acento; label uppercase tracked; valor em display mono. Telas novas que mostram um número-rei copiam esta peça, não um card genérico.
 
 ### Timeline (assinatura)
 Lista com trilho 18px: pino Perfil no default, ok no fuel, âmbar/vermelho no aviso. O glow do pino é estrutural. Não transformar a timeline em feed com avatar e sombra.
@@ -258,7 +258,7 @@ Lista com trilho 18px: pino Perfil no default, ok no fuel, âmbar/vermelho no av
 ### Do:
 - **Do** tratar o violeta Perfil como ponteiro (primário, ativo, faixa, foco) e deixar o resto em cinza de produção.
 - **Do** pôr dinheiro, km, L e placa em Chivo Mono tabular.
-- **Do** usar KPI com ticks + faixa e timeline com trilho de tipo quando a tela mostra telemetria.
+- **Do** usar KPI com faixa de acento e timeline com trilho de tipo quando a tela mostra telemetria.
 - **Do** manter alvo 44px, raio 10/14, costura 1px, e ações de form visíveis acima da bottom nav no telefone.
 - **Do** toque + ⋯ nas listas; cadastro novo no + do dropdown.
 - **Do** remapear papéis no tema claro — não inventar uma segunda identidade.

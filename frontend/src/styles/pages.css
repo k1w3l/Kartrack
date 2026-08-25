@@ -158,6 +158,9 @@
 
 .vehicle-strip-meta h2 {
   font-size: var(--text-lg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .vehicle-strip-meta .plate {
@@ -206,27 +209,13 @@
 }
 
 .metric-card {
-  position: relative;
-  overflow: hidden;
   min-width: 152px;
   scroll-snap-align: start;
-  padding: var(--space-4) var(--space-3);
+  padding: var(--space-4);
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   border-left: 3px solid var(--accent);
-}
-
-.metric-card::before {
-  content: "";
-  position: absolute;
-  inset: 8px auto 8px 0;
-  width: 8px;
-  background-image: repeating-linear-gradient(
-    to bottom,
-    var(--tick) 0 2px,
-    transparent 2px 7px
-  );
 }
 
 .metric-card .label {
@@ -238,6 +227,10 @@
   text-transform: uppercase;
   color: var(--muted);
   font-weight: 600;
+}
+
+.metric-card .label svg {
+  color: var(--accent);
 }
 
 .metric-card .value {
