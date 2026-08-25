@@ -90,9 +90,9 @@ export default function BackupRestorePage({ vehicleId }) {
           <div className="card">
             <h2 className="section-title"><Icon name="fileInput" size={16} />Importação</h2>
             <div className="stack">
-              <label className="btn btn-accent"><Icon name="fuel" size={16} />Importar abastecimentos<input type="file" className="file-hidden" accept=".csv" onChange={(e) => importCsv('abastecimentos', e.target.files?.[0])} /></label>
-              <label className="btn btn-accent"><Icon name="receipt" size={16} />Importar despesas<input type="file" className="file-hidden" accept=".csv" onChange={(e) => importCsv('despesas', e.target.files?.[0])} /></label>
-              <label className="btn btn-accent"><Icon name="archive" size={16} />Importar todos os registros<input type="file" className="file-hidden" accept=".csv" onChange={(e) => importCsv('todos', e.target.files?.[0])} /></label>
+              <label className="btn btn-accent w-full"><Icon name="fuel" size={16} />Importar abastecimentos<input type="file" className="file-hidden" accept=".csv" onChange={(e) => importCsv('abastecimentos', e.target.files?.[0])} /></label>
+              <label className="btn btn-accent w-full"><Icon name="receipt" size={16} />Importar despesas<input type="file" className="file-hidden" accept=".csv" onChange={(e) => importCsv('despesas', e.target.files?.[0])} /></label>
+              <label className="btn btn-accent w-full"><Icon name="archive" size={16} />Importar todos os registros<input type="file" className="file-hidden" accept=".csv" onChange={(e) => importCsv('todos', e.target.files?.[0])} /></label>
             </div>
           </div>
         </div>
@@ -101,9 +101,9 @@ export default function BackupRestorePage({ vehicleId }) {
           <div className="card">
             <h2 className="section-title"><Icon name="fileOutput" size={16} />Exportação</h2>
             <div className="stack">
-              <a className="btn btn-ok" href={`${API_BASE_URL}/records/export?vehicle_id=${vehicleId}&mode=abastecimentos`} target="_blank" rel="noreferrer"><Icon name="fuel" size={16} />Exportar abastecimentos</a>
-              <a className="btn btn-ok" href={`${API_BASE_URL}/records/export?vehicle_id=${vehicleId}&mode=despesas`} target="_blank" rel="noreferrer"><Icon name="receipt" size={16} />Exportar despesas</a>
-              <a className="btn btn-ok" href={`${API_BASE_URL}/records/export?vehicle_id=${vehicleId}&mode=todos`} target="_blank" rel="noreferrer"><Icon name="archive" size={16} />Exportar todos os registros</a>
+              <a className="btn btn-ok w-full" href={`${API_BASE_URL}/records/export?vehicle_id=${vehicleId}&mode=abastecimentos`} target="_blank" rel="noreferrer"><Icon name="fuel" size={16} />Exportar abastecimentos</a>
+              <a className="btn btn-ok w-full" href={`${API_BASE_URL}/records/export?vehicle_id=${vehicleId}&mode=despesas`} target="_blank" rel="noreferrer"><Icon name="receipt" size={16} />Exportar despesas</a>
+              <a className="btn btn-ok w-full" href={`${API_BASE_URL}/records/export?vehicle_id=${vehicleId}&mode=todos`} target="_blank" rel="noreferrer"><Icon name="archive" size={16} />Exportar todos os registros</a>
             </div>
           </div>
         </div>

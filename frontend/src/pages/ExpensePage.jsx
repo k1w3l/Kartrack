@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../api'
 import { useUI } from '../components/UIProvider'
-import Field, { ToggleCreate, ChipList, AutoGrowTextarea } from '../components/Field'
+import Field, { LookupSelect, ChipList, AutoGrowTextarea } from '../components/Field'
 import Icon from '../components/Icon'
 import { ButtonSpinner } from '../components/Loading'
 
@@ -45,17 +45,6 @@ function addInterval(isoDate, frequency, steps) {
   else if (frequency === 'mensal') d.setMonth(d.getMonth() + steps)
   else if (frequency === 'anual') d.setFullYear(d.getFullYear() + steps)
   return d.toISOString().slice(0, 10)
-}
-
-function renderInlineCreateField({ show, value, onChange, onAdd, placeholder }) {
-  if (!show) return null
-
-  return (
-    <div className="inline-add">
-      <input className="input" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
-      <button type="button" className="btn btn-sm btn-accent" onClick={onAdd}>Adicionar</button>
-    </div>
-  )
 }
 
 function parseMaintenanceItems(block) {
@@ -168,30 +157,6 @@ export default function ExpensePage({ vehicleId }) {
   const [manutencaoPecas, setManutencaoPecas] = useState([])
   const [manutencaoServicos, setManutencaoServicos] = useState([])
 
-  const [novos, setNovos] = useState({
-    oficina: '',
-    peca: '',
-    servico: '',
-    localEstacionamento: '',
-    localEstetica: '',
-    tipoMulta: '',
-    tipoImposto: '',
-    seguradora: '',
-    financeira: '',
-  })
-
-  const [showNovo, setShowNovo] = useState({
-    oficina: false,
-    peca: false,
-    servico: false,
-    localEstacionamento: false,
-    localEstetica: false,
-    tipoMulta: false,
-    tipoImposto: false,
-    seguradora: false,
-    financeira: false,
-  })
-
   const tipoKey = useMemo(() => form.tipoPrincipal.toLowerCase(), [form.tipoPrincipal])
   const totalPecas = useMemo(() => manutencaoPecas.reduce((sum, item) => sum + Number(item.valor || 0), 0), [manutencaoPecas])
   const totalServicos = useMemo(() => manutencaoServicos.reduce((sum, item) => sum + Number(item.valor || 0), 0), [manutencaoServicos])
@@ -260,32 +225,29 @@ export default function ExpensePage({ vehicleId }) {
     }).catch(() => navigate('/'))
   }, [vehicleId, editId, cloneId, navigate, isEditing])
 
-  const addOption = async (field) => {
-    const value = (novos[field] || '').trim()
-    if (!value) return
+  const addLookup = async (field, rawValue) => {
+    const value = String(rawValue || '').trim()
+    if (!value) return false
 
     const map = {
-      oficina: [oficinas, setOficinas, LIST_CATEGORIES.oficinas, 'oficina', 'oficinas'],
-      peca: [pecas, setPecas, LIST_CATEGORIES.pecas, 'peca', 'pecas'],
-      servico: [servicos, setServicos, LIST_CATEGORIES.servicos, 'servico', 'servicos'],
-      localEstacionamento: [locaisEstacionamento, setLocaisEstacionamento, LIST_CATEGORIES.locaisEstacionamento, 'localEstacionamento', 'locaisEstacionamento'],
-      localEstetica: [locaisEstetica, setLocaisEstetica, LIST_CATEGORIES.locaisEstetica, 'localEstetica', 'locaisEstetica'],
-      tipoMulta: [tiposMulta, setTiposMulta, LIST_CATEGORIES.tiposMulta, 'tipoMulta', 'tiposMulta'],
-      tipoImposto: [tiposImposto, setTiposImposto, LIST_CATEGORIES.tiposImposto, 'tipoImposto', 'tiposImposto'],
-      seguradora: [seguradoras, setSeguradoras, LIST_CATEGORIES.seguradoras, 'seguradora', 'seguradoras'],
-      financeira: [financeiras, setFinanceiras, LIST_CATEGORIES.financeiras, 'financeira', 'financeiras'],
+      oficina: [setOficinas, LIST_CATEGORIES.oficinas, 'oficina', 'oficinas'],
+      peca: [setPecas, LIST_CATEGORIES.pecas, 'peca', 'pecas'],
+      servico: [setServicos, LIST_CATEGORIES.servicos, 'servico', 'servicos'],
+      localEstacionamento: [setLocaisEstacionamento, LIST_CATEGORIES.locaisEstacionamento, 'localEstacionamento', 'locaisEstacionamento'],
+      localEstetica: [setLocaisEstetica, LIST_CATEGORIES.locaisEstetica, 'localEstetica', 'locaisEstetica'],
+      tipoMulta: [setTiposMulta, LIST_CATEGORIES.tiposMulta, 'tipoMulta', 'tiposMulta'],
+      tipoImposto: [setTiposImposto, LIST_CATEGORIES.tiposImposto, 'tipoImposto', 'tiposImposto'],
+      seguradora: [setSeguradoras, LIST_CATEGORIES.seguradoras, 'seguradora', 'seguradoras'],
+      financeira: [setFinanceiras, LIST_CATEGORIES.financeiras, 'financeira', 'financeiras'],
     }
 
-    const [arr, setter, category, formKey, stateKey] = map[field]
+    const [setter, category, formKey, stateKey] = map[field]
     try {
       await api.post('/lookup', { category, value })
     } catch {}
     const next = await loadOptionList(stateKey)
     setter(next)
-
     setForm((prev) => ({ ...prev, [formKey]: value }))
-    setNovos((prev) => ({ ...prev, [field]: '' }))
-    setShowNovo((prev) => ({ ...prev, [field]: false }))
   }
 
   const addPecaManutencao = () => {
@@ -427,7 +389,19 @@ export default function ExpensePage({ vehicleId }) {
 
       <div className="grid-2">
         <Field label="Tipo" icon="layers"><select className="select" value={form.tipoPrincipal} onChange={(e) => setForm({ ...form, tipoPrincipal: e.target.value })}>{TIPOS_DESPESA.map((tipo) => <option key={tipo}>{tipo}</option>)}</select></Field>
-        {tipoKey === 'financiamento' && <Field label="Financeira" icon="landmark"><select className="select" value={form.financeira} onChange={(e) => setForm({ ...form, financeira: e.target.value })}>{financeiras.map((item) => <option key={item}>{item}</option>)}</select><ToggleCreate show={showNovo.financeira} onToggle={() => setShowNovo((prev) => ({ ...prev, financeira: !prev.financeira }))} addLabel="Cadastrar nova financeira" cancelLabel="Cancelar" value={novos.financeira} onChange={(v) => setNovos((prev) => ({ ...prev, financeira: v }))} onAdd={() => addOption('financeira')} placeholder="Ex.: Banco XYZ" /></Field>}
+        {tipoKey === 'financiamento' && (
+          <Field label="Financeira" icon="landmark">
+            <LookupSelect
+              value={form.financeira}
+              onChange={(financeira) => setForm({ ...form, financeira })}
+              options={financeiras}
+              placeholder=""
+              addPlaceholder="Ex.: Banco XYZ"
+              addAriaLabel="Cadastrar nova financeira"
+              onAdd={(value) => addLookup('financeira', value)}
+            />
+          </Field>
+        )}
         <Field label="Data" icon="calendar"><input className="input" type="date" value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} /></Field>
 
         {(tipoKey === 'manutenção' || tipoKey === 'km inicial') && (
@@ -447,25 +421,30 @@ export default function ExpensePage({ vehicleId }) {
         {tipoKey === 'manutenção' && (
           <>
             <Field label="Oficina" icon="warehouse">
-              <select className="select" value={form.oficina} onChange={(e) => setForm({ ...form, oficina: e.target.value })}>{oficinas.map((item) => <option key={item}>{item}</option>)}</select>
-              <ToggleCreate show={showNovo.oficina} onToggle={() => setShowNovo((prev) => ({ ...prev, oficina: !prev.oficina }))} addLabel="Cadastrar nova oficina" cancelLabel="Cancelar" value={novos.oficina} onChange={(v) => setNovos((prev) => ({ ...prev, oficina: v }))} onAdd={() => addOption('oficina')} placeholder="Ex.: Oficina do João" />
+              <LookupSelect
+                value={form.oficina}
+                onChange={(oficina) => setForm({ ...form, oficina })}
+                options={oficinas}
+                placeholder=""
+                addPlaceholder="Ex.: Oficina do João"
+                addAriaLabel="Cadastrar nova oficina"
+                onAdd={(value) => addLookup('oficina', value)}
+              />
             </Field>
 
             <Field label="Peças" icon="settings" span>
-              <div className="grid-2">
-                <div>
-                  <select className="select" value={form.peca} onChange={(e) => setForm({ ...form, peca: e.target.value })}>{pecas.map((item) => <option key={item}>{item}</option>)}</select>
-                  <button type="button" className="btn btn-link btn-sm" onClick={() => setShowNovo((prev) => ({ ...prev, peca: !prev.peca }))}>{showNovo.peca ? 'Cancelar nova peça' : 'Cadastrar nova peça'}</button>
-                  {renderInlineCreateField({
-                    show: showNovo.peca,
-                    value: novos.peca,
-                    onChange: (v) => setNovos((prev) => ({ ...prev, peca: v })),
-                    onAdd: () => addOption('peca'),
-                    placeholder: 'Ex.: Pastilha de freio',
-                  })}
-                </div>
-                <div><input className="input" type="number" inputMode="decimal" min="0" step="0.01" placeholder="Valor da peça" value={form.valorPecaItem} onChange={(e) => setForm({ ...form, valorPecaItem: e.target.value })} /></div>
-                <div className="cluster">{form.peca && Number(form.valorPecaItem || 0) >= 0 && <button type="button" className="btn btn-sm btn-accent" onClick={addPecaManutencao}>Adicionar</button>}</div>
+              <LookupSelect
+                value={form.peca}
+                onChange={(peca) => setForm({ ...form, peca })}
+                options={pecas}
+                placeholder=""
+                addPlaceholder="Ex.: Pastilha de freio"
+                addAriaLabel="Cadastrar nova peça"
+                onAdd={(value) => addLookup('peca', value)}
+              />
+              <div className="input-row">
+                <input className="input" type="number" inputMode="decimal" min="0" step="0.01" placeholder="Valor da peça" value={form.valorPecaItem} onChange={(e) => setForm({ ...form, valorPecaItem: e.target.value })} />
+                <button type="button" className="btn btn-accent" onClick={addPecaManutencao}>Adicionar</button>
               </div>
               {!!manutencaoPecas.length && <ChipList items={manutencaoPecas} onRemove={removePecaManutencao} />}
             </Field>
@@ -473,20 +452,18 @@ export default function ExpensePage({ vehicleId }) {
             <Field label="Valor das peças" icon="coins"><input className="input" value={totalPecas.toFixed(2)} readOnly /></Field>
 
             <Field label="Serviços" icon="wrench" span>
-              <div className="grid-2">
-                <div>
-                  <select className="select" value={form.servico} onChange={(e) => setForm({ ...form, servico: e.target.value })}>{servicos.map((item) => <option key={item}>{item}</option>)}</select>
-                  <button type="button" className="btn btn-link btn-sm" onClick={() => setShowNovo((prev) => ({ ...prev, servico: !prev.servico }))}>{showNovo.servico ? 'Cancelar novo serviço' : 'Cadastrar novo serviço'}</button>
-                  {renderInlineCreateField({
-                    show: showNovo.servico,
-                    value: novos.servico,
-                    onChange: (v) => setNovos((prev) => ({ ...prev, servico: v })),
-                    onAdd: () => addOption('servico'),
-                    placeholder: 'Ex.: Revisão elétrica',
-                  })}
-                </div>
-                <div><input className="input" type="number" inputMode="decimal" min="0" step="0.01" placeholder="Valor do serviço" value={form.valorServicoItem} onChange={(e) => setForm({ ...form, valorServicoItem: e.target.value })} /></div>
-                <div className="cluster">{form.servico && Number(form.valorServicoItem || 0) >= 0 && <button type="button" className="btn btn-sm btn-accent" onClick={addServicoManutencao}>Adicionar</button>}</div>
+              <LookupSelect
+                value={form.servico}
+                onChange={(servico) => setForm({ ...form, servico })}
+                options={servicos}
+                placeholder=""
+                addPlaceholder="Ex.: Revisão elétrica"
+                addAriaLabel="Cadastrar novo serviço"
+                onAdd={(value) => addLookup('servico', value)}
+              />
+              <div className="input-row">
+                <input className="input" type="number" inputMode="decimal" min="0" step="0.01" placeholder="Valor do serviço" value={form.valorServicoItem} onChange={(e) => setForm({ ...form, valorServicoItem: e.target.value })} />
+                <button type="button" className="btn btn-accent" onClick={addServicoManutencao}>Adicionar</button>
               </div>
               {!!manutencaoServicos.length && <ChipList items={manutencaoServicos} onRemove={removeServicoManutencao} />}
             </Field>
@@ -503,8 +480,15 @@ export default function ExpensePage({ vehicleId }) {
         {tipoKey === 'multa' && (
           <>
             <Field label="Tipo da multa" icon="triangleAlert">
-              <select className="select" value={form.tipoMulta} onChange={(e) => setForm({ ...form, tipoMulta: e.target.value })}>{tiposMulta.map((item) => <option key={item}>{item}</option>)}</select>
-              <ToggleCreate show={showNovo.tipoMulta} onToggle={() => setShowNovo((prev) => ({ ...prev, tipoMulta: !prev.tipoMulta }))} addLabel="Cadastrar novo tipo" cancelLabel="Cancelar" value={novos.tipoMulta} onChange={(v) => setNovos((prev) => ({ ...prev, tipoMulta: v }))} onAdd={() => addOption('tipoMulta')} placeholder="Ex.: Rodízio" />
+              <LookupSelect
+                value={form.tipoMulta}
+                onChange={(tipoMulta) => setForm({ ...form, tipoMulta })}
+                options={tiposMulta}
+                placeholder=""
+                addPlaceholder="Ex.: Rodízio"
+                addAriaLabel="Cadastrar novo tipo de multa"
+                onAdd={(value) => addLookup('tipoMulta', value)}
+              />
             </Field>
             <Field label="Local" icon="mapPin"><input className="input" value={form.local || ''} onChange={(e) => setForm({ ...form, local: e.target.value })} /></Field>
             <Field label="Descrição" icon="stickyNote"><AutoGrowTextarea value={form.descricao} onChange={(value) => setForm({ ...form, descricao: value })} /></Field>
@@ -524,13 +508,33 @@ export default function ExpensePage({ vehicleId }) {
         )}
 
         {tipoKey === 'impostos' && <>
-          <Field label="Tipo de imposto" icon="fileSpreadsheet"><select className="select" value={form.tipoImposto} onChange={(e) => setForm({ ...form, tipoImposto: e.target.value })}>{tiposImposto.map((item) => <option key={item}>{item}</option>)}</select><ToggleCreate show={showNovo.tipoImposto} onToggle={() => setShowNovo((prev) => ({ ...prev, tipoImposto: !prev.tipoImposto }))} addLabel="Cadastrar novo tipo de imposto" cancelLabel="Cancelar" value={novos.tipoImposto} onChange={(v) => setNovos((prev) => ({ ...prev, tipoImposto: v }))} onAdd={() => addOption('tipoImposto')} placeholder="Ex.: Taxa administrativa" /></Field>
+          <Field label="Tipo de imposto" icon="fileSpreadsheet">
+            <LookupSelect
+              value={form.tipoImposto}
+              onChange={(tipoImposto) => setForm({ ...form, tipoImposto })}
+              options={tiposImposto}
+              placeholder=""
+              addPlaceholder="Ex.: Taxa administrativa"
+              addAriaLabel="Cadastrar novo tipo de imposto"
+              onAdd={(value) => addLookup('tipoImposto', value)}
+            />
+          </Field>
           <Field label="Descrição" icon="stickyNote"><AutoGrowTextarea value={form.descricao} onChange={(value) => setForm({ ...form, descricao: value })} /></Field>
         </>}
 
         {tipoKey === 'seguro' && (
           <>
-            <Field label="Seguradora" icon="shield"><select className="select" value={form.seguradora} onChange={(e) => setForm({ ...form, seguradora: e.target.value })}>{seguradoras.map((item) => <option key={item}>{item}</option>)}</select><ToggleCreate show={showNovo.seguradora} onToggle={() => setShowNovo((prev) => ({ ...prev, seguradora: !prev.seguradora }))} addLabel="Cadastrar nova seguradora" cancelLabel="Cancelar" value={novos.seguradora} onChange={(v) => setNovos((prev) => ({ ...prev, seguradora: v }))} onAdd={() => addOption('seguradora')} placeholder="Ex.: Tokio Marine" /></Field>
+            <Field label="Seguradora" icon="shield">
+              <LookupSelect
+                value={form.seguradora}
+                onChange={(seguradora) => setForm({ ...form, seguradora })}
+                options={seguradoras}
+                placeholder=""
+                addPlaceholder="Ex.: Tokio Marine"
+                addAriaLabel="Cadastrar nova seguradora"
+                onAdd={(value) => addLookup('seguradora', value)}
+              />
+            </Field>
             <Field label="Classe de bônus" icon="star"><input className="input" value={form.classeBonus} onChange={(e) => setForm({ ...form, classeBonus: e.target.value })} /></Field>
             <Field label="Valor da parcela" icon="coins"><input className="input" type="number" inputMode="decimal" min="0" step="0.01" value={form.valorParcela} onChange={(e) => setForm({ ...form, valorParcela: e.target.value })} /></Field>
             <Field label="Quantidade de parcelas" icon="listOrdered"><input className="input" type="number" inputMode="numeric" min="1" step="1" value={form.parcelas} onChange={(e) => setForm({ ...form, parcelas: e.target.value })} /></Field>
@@ -548,13 +552,33 @@ export default function ExpensePage({ vehicleId }) {
         )}
 
         {tipoKey === 'estacionamento' && <>
-          <Field label="Local" icon="parking"><select className="select" value={form.localEstacionamento} onChange={(e) => setForm({ ...form, localEstacionamento: e.target.value })}>{locaisEstacionamento.map((item) => <option key={item}>{item}</option>)}</select><ToggleCreate show={showNovo.localEstacionamento} onToggle={() => setShowNovo((prev) => ({ ...prev, localEstacionamento: !prev.localEstacionamento }))} addLabel="Cadastrar novo local" cancelLabel="Cancelar" value={novos.localEstacionamento} onChange={(v) => setNovos((prev) => ({ ...prev, localEstacionamento: v }))} onAdd={() => addOption('localEstacionamento')} placeholder="Ex.: Shopping Central" /></Field>
+          <Field label="Local" icon="parking">
+            <LookupSelect
+              value={form.localEstacionamento}
+              onChange={(localEstacionamento) => setForm({ ...form, localEstacionamento })}
+              options={locaisEstacionamento}
+              placeholder=""
+              addPlaceholder="Ex.: Shopping Central"
+              addAriaLabel="Cadastrar novo local"
+              onAdd={(value) => addLookup('localEstacionamento', value)}
+            />
+          </Field>
           <Field label="Descrição" icon="stickyNote"><AutoGrowTextarea value={form.descricao} onChange={(value) => setForm({ ...form, descricao: value })} /></Field>
         </>}
 
         {tipoKey === 'estética' && (
           <>
-            <Field label="Local" icon="sparkles"><select className="select" value={form.localEstetica} onChange={(e) => setForm({ ...form, localEstetica: e.target.value })}>{locaisEstetica.map((item) => <option key={item}>{item}</option>)}</select><ToggleCreate show={showNovo.localEstetica} onToggle={() => setShowNovo((prev) => ({ ...prev, localEstetica: !prev.localEstetica }))} addLabel="Cadastrar novo local" cancelLabel="Cancelar" value={novos.localEstetica} onChange={(v) => setNovos((prev) => ({ ...prev, localEstetica: v }))} onAdd={() => addOption('localEstetica')} placeholder="Ex.: Estética da Vila" /></Field>
+            <Field label="Local" icon="sparkles">
+              <LookupSelect
+                value={form.localEstetica}
+                onChange={(localEstetica) => setForm({ ...form, localEstetica })}
+                options={locaisEstetica}
+                placeholder=""
+                addPlaceholder="Ex.: Estética da Vila"
+                addAriaLabel="Cadastrar novo local"
+                onAdd={(value) => addLookup('localEstetica', value)}
+              />
+            </Field>
             <Field label="Descrição" icon="stickyNote"><AutoGrowTextarea value={form.descricao} onChange={(value) => setForm({ ...form, descricao: value })} /></Field>
             <Field label="Valor" icon="banknote" span><input className="input" type="number" inputMode="decimal" min="0" step="0.01" value={form.valor} onChange={(e) => setForm({ ...form, valor: e.target.value })} /></Field>
           </>

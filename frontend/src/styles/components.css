@@ -236,6 +236,10 @@ label.btn {
   flex: 1;
 }
 
+.input-row .btn.icon-btn {
+  flex: 0 0 44px;
+}
+
 .check {
   display: flex;
   align-items: center;

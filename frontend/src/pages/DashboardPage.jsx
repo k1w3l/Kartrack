@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import api from '../api'
 import Modal from '../components/Modal'
 import Icon, { recordIconName } from '../components/Icon'
+import FilterSheet from '../components/FilterSheet'
+import MetricCard from '../components/MetricCard'
+import OverflowMenu from '../components/OverflowMenu'
 import { Spinner, TimelineSkeleton } from '../components/Loading'
 import { useUI } from '../components/UIProvider'
 
@@ -161,7 +164,6 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
   const [filtersHydrated, setFiltersHydrated] = useState(false)
   const [detailModal, setDetailModal] = useState(null)
   const [filterOpen, setFilterOpen] = useState(false)
-  const [menuKey, setMenuKey] = useState(null)
   const printAreaRef = useRef(null)
 
   const load = async () => {
@@ -346,7 +348,7 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
       body { font-family: Chivo, system-ui, sans-serif; color: #1a1814; margin: 24px; }
       .section-title { font-size: 16px; margin: 0 0 12px; font-weight: 700; }
       .timeline-item { border-bottom: 1px solid #d6cfc2; padding: 10px 0; }
-      .timeline-overflow, .timeline-menu, .timeline-pager { display: none !important; }
+      .timeline-overflow, .overflow-menu, .timeline-menu, .timeline-pager { display: none !important; }
       .timeline-hit { display: block !important; border: 0; background: transparent; padding: 0; text-align: left; color: inherit; }
       .muted { color: #6f675c; }
       .num, .timeline-valor { font-family: "Chivo Mono", monospace; }
@@ -362,28 +364,6 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
     tipoFiltro === 'todos' ? 'Todos os tipos' : formatTipoRegistro(tipoFiltro),
     String(search).trim() ? `“${String(search).trim()}”` : '',
   ])
-
-  useEffect(() => {
-    if (!filterOpen && !menuKey) return undefined
-    const onKey = (event) => {
-      if (event.key === 'Escape') {
-        setFilterOpen(false)
-        setMenuKey(null)
-      }
-    }
-    const onPointer = (event) => {
-      if (menuKey && !event.target.closest?.('.timeline-overflow')) setMenuKey(null)
-    }
-    document.addEventListener('keydown', onKey)
-    document.addEventListener('mousedown', onPointer)
-    const previousOverflow = document.body.style.overflow
-    if (filterOpen) document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      document.removeEventListener('mousedown', onPointer)
-      document.body.style.overflow = previousOverflow
-    }
-  }, [filterOpen, menuKey])
 
   if (!vehicleId) return <div className="alert alert-info">Cadastre um veículo em "Meu veículo".</div>
   if (loading && !dashboard) return <Spinner label="Carregando dados do veículo..." />
@@ -441,7 +421,6 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
           <div className="timeline-log">
             {paginatedTimeline.map((item, idx) => {
               const key = `${item.tipo_registro}-${item.id}`
-              const menuOpen = menuKey === key
               const kmLabel = item.quilometragem ? `${item.quilometragem} km` : ''
               return (
                 <div className={`timeline-item ${timelineTone(item.tipo_registro)}`} key={key} style={{ animationDelay: `${Math.min(idx, 8) * 45}ms` }}>
@@ -457,31 +436,13 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
                     </div>
                     <p className="muted small">{buildTimelineDescription(item)}</p>
                   </button>
-                  <div className="timeline-overflow">
-                    <button
-                      type="button"
-                      className="btn btn-ghost icon-btn"
-                      aria-label="Mais ações"
-                      aria-haspopup="menu"
-                      aria-expanded={menuOpen}
-                      onClick={() => setMenuKey(menuOpen ? null : key)}
-                    >
-                      <Icon name="moreVertical" size={18} />
-                    </button>
-                    {menuOpen && (
-                      <div className="timeline-menu card" role="menu">
-                        <button type="button" className="dropdown-item" role="menuitem" onClick={() => { setMenuKey(null); cloneRecord(item) }}>
-                          <Icon name="copy" size={16} />Clonar
-                        </button>
-                        <button type="button" className="dropdown-item" role="menuitem" onClick={() => { setMenuKey(null); editRecord(item) }}>
-                          <Icon name="squarePen" size={16} />Editar
-                        </button>
-                        <button type="button" className="dropdown-item is-danger" role="menuitem" onClick={() => { setMenuKey(null); deleteRecord(item) }}>
-                          <Icon name="trash" size={16} />Excluir
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  <OverflowMenu
+                    items={[
+                      { label: 'Clonar', icon: 'copy', onClick: () => cloneRecord(item) },
+                      { label: 'Editar', icon: 'squarePen', onClick: () => editRecord(item) },
+                      { label: 'Excluir', icon: 'trash', danger: true, onClick: () => deleteRecord(item) },
+                    ]}
+                  />
                 </div>
               )
             })}
@@ -499,86 +460,69 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
         )}
       </div>
 
-      {filterOpen && (
-        <div
-          className="filter-overlay"
-          onMouseDown={(event) => { if (event.target === event.currentTarget) setFilterOpen(false) }}
-        >
-          <div className="filter-sheet" role="dialog" aria-modal="true" aria-labelledby="filter-sheet-title">
-            <div className="modal-head">
-              <h2 id="filter-sheet-title" className="section-title" style={{ marginBottom: 0 }}>
-                <Icon name="filter" size={18} />Filtros
-              </h2>
-              <button type="button" className="btn btn-ghost icon-btn" onClick={() => setFilterOpen(false)} aria-label="Fechar">
-                <Icon name="x" />
-              </button>
-            </div>
-            <div className="stack">
-              <label className="field">
-                <span className="field-label">Pesquisar</span>
-                <input
-                  className="input"
-                  type="search"
-                  value={search}
-                  onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-                  placeholder="Texto, posto, valor…"
-                />
-              </label>
-              <label className="field">
-                <span className="field-label">Período</span>
-                <select className="select" value={periodMode} onChange={(e) => setPeriodMode(e.target.value)}>
-                  <option value="mes">Mês/ano</option>
-                  <option value="periodo">Período</option>
-                  <option value="historico">Histórico completo</option>
-                </select>
-              </label>
-              {periodMode === 'mes' && (
-                <div className="cluster">
-                  <label className="field grow">
-                    <span className="field-label">Mês</span>
-                    <select className="select" value={month} onChange={(e) => setMonth(e.target.value)}>{Array.from({ length: 12 }).map((_, i) => { const m = String(i + 1).padStart(2, '0'); return <option key={m} value={m}>{m}</option> })}</select>
-                  </label>
-                  <label className="field grow">
-                    <span className="field-label">Ano</span>
-                    <select className="select" value={year} onChange={(e) => setYear(e.target.value)}>{Array.from({ length: 8 }).map((_, i) => { const y = String(now.getFullYear() - i); return <option key={y} value={y}>{y}</option> })}</select>
-                  </label>
-                </div>
-              )}
-              {periodMode === 'periodo' && (
-                <div className="cluster">
-                  <label className="field grow">
-                    <span className="field-label">De</span>
-                    <input className="input" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-                  </label>
-                  <label className="field grow">
-                    <span className="field-label">Até</span>
-                    <input className="input" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
-                  </label>
-                </div>
-              )}
-              <label className="field">
-                <span className="field-label">Tipo</span>
-                <select className="select" value={tipoFiltro} onChange={(e) => { setTipoFiltro(e.target.value); setPage(1) }}>
-                  <option value="todos">Todos os tipos</option>
-                  {tipoOptions.map((tipo) => <option key={tipo} value={tipo}>{formatTipoRegistro(tipo)}</option>)}
-                </select>
-              </label>
-              <label className="field">
-                <span className="field-label">Por página</span>
-                <select className="select" value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1) }}>
-                  <option value={10}>10</option>
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
-                </select>
-              </label>
-            </div>
-            <div className="modal-foot">
-              <button type="button" className="btn btn-ghost" onClick={exportTimelinePdf}><Icon name="fileDown" size={16} />PDF</button>
-              <button type="button" className="btn btn-primary" onClick={() => setFilterOpen(false)}>Pronto</button>
-            </div>
+      <FilterSheet
+        open={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        footer={<button type="button" className="btn btn-ghost" onClick={exportTimelinePdf}><Icon name="fileDown" size={16} />PDF</button>}
+      >
+        <label className="field">
+          <span className="field-label">Pesquisar</span>
+          <input
+            className="input"
+            type="search"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+            placeholder="Texto, posto, valor…"
+          />
+        </label>
+        <label className="field">
+          <span className="field-label">Período</span>
+          <select className="select" value={periodMode} onChange={(e) => setPeriodMode(e.target.value)}>
+            <option value="mes">Mês/ano</option>
+            <option value="periodo">Período</option>
+            <option value="historico">Histórico completo</option>
+          </select>
+        </label>
+        {periodMode === 'mes' && (
+          <div className="cluster">
+            <label className="field grow">
+              <span className="field-label">Mês</span>
+              <select className="select" value={month} onChange={(e) => setMonth(e.target.value)}>{Array.from({ length: 12 }).map((_, i) => { const m = String(i + 1).padStart(2, '0'); return <option key={m} value={m}>{m}</option> })}</select>
+            </label>
+            <label className="field grow">
+              <span className="field-label">Ano</span>
+              <select className="select" value={year} onChange={(e) => setYear(e.target.value)}>{Array.from({ length: 8 }).map((_, i) => { const y = String(now.getFullYear() - i); return <option key={y} value={y}>{y}</option> })}</select>
+            </label>
           </div>
-        </div>
-      )}
+        )}
+        {periodMode === 'periodo' && (
+          <div className="cluster">
+            <label className="field grow">
+              <span className="field-label">De</span>
+              <input className="input" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+            </label>
+            <label className="field grow">
+              <span className="field-label">Até</span>
+              <input className="input" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+            </label>
+          </div>
+        )}
+        <label className="field">
+          <span className="field-label">Tipo</span>
+          <select className="select" value={tipoFiltro} onChange={(e) => { setTipoFiltro(e.target.value); setPage(1) }}>
+            <option value="todos">Todos os tipos</option>
+            {tipoOptions.map((tipo) => <option key={tipo} value={tipo}>{formatTipoRegistro(tipo)}</option>)}
+          </select>
+        </label>
+        <label className="field">
+          <span className="field-label">Por página</span>
+          <select className="select" value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1) }}>
+            <option value={10}>10</option>
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+          </select>
+        </label>
+      </FilterSheet>
       <Modal
         open={Boolean(detailModal)}
         onClose={() => setDetailModal(null)}
@@ -606,15 +550,6 @@ export default function DashboardPage({ vehicleId, currentVehicle }) {
           </>
         )}
       </Modal>
-    </div>
-  )
-}
-
-function MetricCard({ icon, title, value }) {
-  return (
-    <div className="metric-card" role="listitem">
-      <div className="label"><Icon name={icon} size={14} />{title}</div>
-      <div className="value">{value}</div>
     </div>
   )
 }

@@ -17,7 +17,7 @@ Dono do carro no telefone, landscape e tablet. Ver o período e o histórico sem
 Filtrar (sheet) → ler KPIs numa faixa → tocar o item para o detalhe → ⋯ para clonar/editar/excluir.
 
 ## Direction
-Mundo **O Painel do Veículo**. Chrome com rodapé (sem rail, sem toggle) abaixo de 1200px. Desktop largo mantém rail + toggle. Faixa de 5 KPIs com ticks. Uma linha = tipo, km, valor.
+Mundo **O Painel do Veículo**. Chrome com rodapé (sem rail, sem toggle) abaixo de 1200px. Desktop largo mantém rail + toggle. Faixa de 5 KPIs com ticks. Uma linha = tipo, km, valor. Controles extraídos: `FilterSheet`, `OverflowMenu`, `MetricCard`.
 
 ## Untouched
-Relatórios, lançamento, copy, polling, lembretes, tema, seletor de veículo.
+Copy, polling, lembretes, tema, seletor de veículo. Contas e payloads.

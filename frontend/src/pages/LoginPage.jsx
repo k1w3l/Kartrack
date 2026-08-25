@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import api, { API_BASE_URL } from '../api'
 import FipeLookupForm from '../components/FipeLookupForm'
+import Field from '../components/Field'
 import Icon from '../components/Icon'
 
 function getApiErrorMessage(error, isRegister) {
@@ -116,8 +117,7 @@ export default function LoginPage({ onLogin, darkMode, onToggleTheme }) {
         {activeTab === 'login' ? (
           <form className="card stack" onSubmit={submit} role="tabpanel">
             {isRegister && (
-              <div className="field">
-                <label className="field-label" htmlFor="login-name">Nome</label>
+              <Field label="Nome" htmlFor="login-name">
                 <input
                   id="login-name"
                   className="input"
@@ -128,10 +128,9 @@ export default function LoginPage({ onLogin, darkMode, onToggleTheme }) {
                   minLength={2}
                   required
                 />
-              </div>
+              </Field>
             )}
-            <div className="field">
-              <label className="field-label" htmlFor="login-email">E-mail</label>
+            <Field label="E-mail" htmlFor="login-email">
               <input
                 id="login-email"
                 className="input"
@@ -143,9 +142,8 @@ export default function LoginPage({ onLogin, darkMode, onToggleTheme }) {
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 required
               />
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="login-password">Senha</label>
+            </Field>
+            <Field label="Senha" htmlFor="login-password">
               <div className="input-row">
                 <input
                   id="login-password"
@@ -162,7 +160,7 @@ export default function LoginPage({ onLogin, darkMode, onToggleTheme }) {
                   <Icon name={showPassword ? 'eyeOff' : 'eye'} />
                 </button>
               </div>
-            </div>
+            </Field>
             {isRegister && <p className="muted small">A senha deve conter pelo menos 6 caracteres.</p>}
 
             {success && <div className="alert alert-ok">{success}</div>}

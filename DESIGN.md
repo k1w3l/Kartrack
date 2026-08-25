@@ -183,7 +183,9 @@ Paleta de um acento só: cinza de produção como matéria, violeta Perfil como 
 
 ## Layout
 
-App shell em grid: header 56px de ponta a ponta; rail 232px (colapsado 72px) + main. Abaixo de 768px o rail some, entra bottom nav 64px + safe-area, e o Mais abre sheet. Conteúdo com padding 16px; ações de formulário grudam acima da bottom nav no telefone.
+App shell em grid: header 56px de ponta a ponta; rail 232px (colapsado 72px) + main. Abaixo de 1200px o rail some, entra bottom nav 64px + safe-area, e o Mais abre sheet. Conteúdo com padding 16px; ações de formulário grudam acima da bottom nav no telefone.
+
+Listas (Início, Registros, veículos, usuários): toque na linha = ação principal; ⋯ para o resto. Filtros e recortes extra em sheet **Filtrar** + faixa de KPI. Formulários: essenciais na página, cadastro novo no **+** do dropdown, não em link. Relatórios: período compacto no topo com PDF e depreciação; abas iguais.
 
 Ritmo 4/8: 4, 8, 12, 16, 24, 32. Grids de conteúdo 1 col → 2 em 768px; métricas 1 → 2 (640px) → 5 (1100px). Fundo do shell: radial do acento a 7% no canto, depois cinza de produção — não um hero.
 
@@ -246,6 +248,11 @@ Placa 14px, faixa esquerda 3px Perfil, trilho de ticks 8px (`tick` 2px ligado / 
 ### Timeline (assinatura)
 Lista com trilho 18px: pino Perfil no default, ok no fuel, âmbar/vermelho no aviso. O glow do pino é estrutural. Não transformar a timeline em feed com avatar e sombra.
 
+### Lists, filters, lookups
+- **OverflowMenu:** ícone ⋯ 44px; painel 188px alinhado à direita. Escape e clique fora fecham.
+- **FilterSheet:** overlay + sheet (rodapé no telefone, centrado ≥1200px). Sempre **Pronto**.
+- **LookupSelect:** select + **+**; o painel de cadastro só abre no plus. Sem “Cadastrar novo…” como link.
+
 ## Do's and Don'ts
 
 ### Do:
@@ -253,6 +260,7 @@ Lista com trilho 18px: pino Perfil no default, ok no fuel, âmbar/vermelho no av
 - **Do** pôr dinheiro, km, L e placa em Chivo Mono tabular.
 - **Do** usar KPI com ticks + faixa e timeline com trilho de tipo quando a tela mostra telemetria.
 - **Do** manter alvo 44px, raio 10/14, costura 1px, e ações de form visíveis acima da bottom nav no telefone.
+- **Do** toque + ⋯ nas listas; cadastro novo no + do dropdown.
 - **Do** remapear papéis no tema claro — não inventar uma segunda identidade.
 
 ### Don't:
@@ -261,3 +269,4 @@ Lista com trilho 18px: pino Perfil no default, ok no fuel, âmbar/vermelho no av
 - **Don't** dropar shadow em placa em repouso, nem glow decorativo longe de foco/ativo/trilho.
 - **Don't** introduzir display serif, ilustração, gradiente de hero, ou app nativo como chrome paralelo.
 - **Don't** promover verde/vermelho/âmbar a cor de marca.
+- **Don't** empilhar Editar/Excluir na linha da lista, nem “Cadastrar novo” como link extra no formulário.

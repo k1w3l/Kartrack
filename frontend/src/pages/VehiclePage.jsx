@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import api, { API_BASE_URL } from '../api'
 import { useUI } from '../components/UIProvider'
+import Field from '../components/Field'
 import Icon from '../components/Icon'
+import OverflowMenu from '../components/OverflowMenu'
 import { ButtonSpinner } from '../components/Loading'
 
 const emptyForm = {
@@ -199,7 +201,7 @@ export default function VehiclePage({ onSaved, activeVehicleId, setActiveVehicle
         <div className="vehicle-grid">
           {vehicles.map((vehicle) => (
             <div className={`card vehicle-card${vehicle.id === activeVehicleId ? ' is-active' : ''}`} key={vehicle.id}>
-              <div className="vehicle-card-main">
+              <button type="button" className="vehicle-card-hit" onClick={() => loadToEdit(vehicle)}>
                 {vehicle.foto_url ? (
                   <img src={vehicle.foto_url} alt={vehicle.nome} className="vehicle-thumb" />
                 ) : (
@@ -214,25 +216,17 @@ export default function VehiclePage({ onSaved, activeVehicleId, setActiveVehicle
                   <p className="muted small"><strong>FIPE:</strong> R$ {Number(vehicle.valor_fipe || 0).toFixed(2)}</p>
                   {vehicle.fipe_reference && <p className="muted small"><strong>Tabela:</strong> {vehicle.fipe_reference}</p>}
                   {vehicle.fipe_code && <p className="muted small"><strong>Código FIPE:</strong> {vehicle.fipe_code}</p>}
+                  {vehicle.id === activeVehicleId && <span className="badge badge-accent">Veículo ativo</span>}
                 </div>
-              </div>
-              <div className="cluster">
-                <button type="button" className="btn btn-sm btn-ghost" onClick={() => loadToEdit(vehicle)} title="Editar">
-                  <Icon name="squarePen" size={14} />Editar
-                </button>
-                <button type="button" className="btn btn-sm btn-ok" disabled={syncingId === vehicle.id} onClick={async () => { setSyncingId(vehicle.id); try { await api.post(`/vehicles/${vehicle.id}/fipe-sync`); await loadVehicles(); onSaved?.(); toast.success('Valor FIPE atualizado.') } catch (err) { toast.error(err?.response?.data?.detail || 'Falha ao atualizar a FIPE.') } finally { setSyncingId(null) } }} title="Atualizar FIPE">
-                  <Icon name="refresh" size={14} spin={syncingId === vehicle.id} />FIPE
-                </button>
-                {vehicle.id !== activeVehicleId && (
-                  <button type="button" className="btn btn-sm btn-accent" onClick={() => setDefault(vehicle.id)} title="Selecionar veículo">
-                    <Icon name="star" size={14} />Selecionar
-                  </button>
-                )}
-                {vehicle.id === activeVehicleId && <span className="badge badge-accent" title="Veículo ativo"><Icon name="star" size={14} /></span>}
-                <button type="button" className="btn btn-sm btn-danger" onClick={() => removeVehicle(vehicle.id)} title="Deletar">
-                  <Icon name="trash" size={14} />Deletar
-                </button>
-              </div>
+              </button>
+              <OverflowMenu
+                items={[
+                  { label: 'Editar', icon: 'squarePen', onClick: () => loadToEdit(vehicle) },
+                  { label: 'Atualizar FIPE', icon: 'refresh', spin: syncingId === vehicle.id, disabled: syncingId === vehicle.id, onClick: async () => { setSyncingId(vehicle.id); try { await api.post(`/vehicles/${vehicle.id}/fipe-sync`); await loadVehicles(); onSaved?.(); toast.success('Valor FIPE atualizado.') } catch (err) { toast.error(err?.response?.data?.detail || 'Falha ao atualizar a FIPE.') } finally { setSyncingId(null) } } },
+                  vehicle.id !== activeVehicleId && { label: 'Selecionar', icon: 'star', onClick: () => setDefault(vehicle.id) },
+                  { label: 'Deletar', icon: 'trash', danger: true, onClick: () => removeVehicle(vehicle.id) },
+                ]}
+              />
             </div>
           ))}
           {!vehicles.length && <p className="muted">Nenhum veículo cadastrado.</p>}
@@ -248,47 +242,37 @@ export default function VehiclePage({ onSaved, activeVehicleId, setActiveVehicle
             ['nome', 'Nome'],
             ['placa', 'Placa'],
           ].map(([key, label]) => (
-            <div className="field" key={key}>
-              <label className="field-label"><Icon name="info" size={14} />{label}</label>
+            <Field key={key} label={label} icon="info">
               <input className="input" value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} required={key !== 'valor_fipe'} />
-            </div>
+            </Field>
           ))}
-          <div className="field">
-            <label className="field-label"><Icon name="factory" size={14} />Marca</label>
+          <Field label="Marca" icon="factory">
             <select className="select" value={form.fipe_brand_id} onChange={(e) => setForm({ ...form, fipe_brand_id: e.target.value, fipe_model_id: '', fipe_year_code: '' })}>
               <option value="">Selecione</option>
               {brands.map((b) => <option key={b.codigo} value={b.codigo}>{b.nome}</option>)}
             </select>
-          </div>
-          <div className="field">
-            <label className="field-label"><Icon name="car" size={14} />Modelo</label>
+          </Field>
+          <Field label="Modelo" icon="car">
             <select className="select" value={form.fipe_model_id} onChange={(e) => setForm({ ...form, fipe_model_id: e.target.value, fipe_year_code: '' })} disabled={!form.fipe_brand_id}>
               <option value="">Selecione</option>
               {models.map((m) => <option key={m.codigo} value={m.codigo}>{m.nome}</option>)}
             </select>
-          </div>
-          <div className="field">
-            <label className="field-label"><Icon name="calendar" size={14} />Ano/combustível</label>
+          </Field>
+          <Field label="Ano/combustível" icon="calendar">
             <select className="select" value={form.fipe_year_code} onChange={(e) => setForm({ ...form, fipe_year_code: e.target.value })} disabled={!form.fipe_model_id}>
               <option value="">Selecione</option>
               {years.map((y) => <option key={y.codigo} value={y.codigo}>{y.nome}</option>)}
             </select>
-          </div>
-          <div className="field">
-            <label className="field-label"><Icon name="wallet" size={14} />Valor FIPE</label>
+          </Field>
+          <Field label="Valor FIPE" icon="wallet">
             <input className="input" value={form.valor_fipe} readOnly />
-          </div>
-
-          <div className="field">
-            <label className="field-label"><Icon name="image" size={14} />Foto do veículo</label>
+          </Field>
+          <Field label="Foto do veículo" icon="image">
             <input className="input" type="file" accept="image/*" onChange={handlePhotoChange} />
             {selectedPhotoFile && (
-              <p className="muted small">
-                Arquivo selecionado: {selectedPhotoFile.name}
-              </p>
+              <p className="muted small">Arquivo selecionado: {selectedPhotoFile.name}</p>
             )}
-          </div>
-
+          </Field>
         </div>
         <div className="form-actions">
           <button type="submit" className="btn btn-primary" disabled={submitting}>

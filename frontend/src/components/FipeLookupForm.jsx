@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import api from '../api'
+import Field from './Field'
 import Icon from './Icon'
 
 const VEHICLE_TYPES = [
@@ -118,9 +119,8 @@ export default function FipeLookupForm() {
   }, [vehicleType, brandId, modelId, yearCode])
 
   return (
-    <div>
-      <div className="field">
-        <label className="field-label" htmlFor="fipe-vehicle-type">Tipo</label>
+    <div className="stack">
+      <Field label="Tipo" htmlFor="fipe-vehicle-type">
         <select
           id="fipe-vehicle-type"
           className="select"
@@ -131,10 +131,9 @@ export default function FipeLookupForm() {
             <option key={t.value} value={t.value}>{t.label}</option>
           ))}
         </select>
-      </div>
+      </Field>
 
-      <div className="field">
-        <label className="field-label" htmlFor="fipe-brand">Marca</label>
+      <Field label="Marca" htmlFor="fipe-brand">
         <select
           id="fipe-brand"
           className="select"
@@ -147,10 +146,9 @@ export default function FipeLookupForm() {
             <option key={b.codigo} value={b.codigo}>{b.nome}</option>
           ))}
         </select>
-      </div>
+      </Field>
 
-      <div className="field">
-        <label className="field-label" htmlFor="fipe-model">Modelo</label>
+      <Field label="Modelo" htmlFor="fipe-model">
         <select
           id="fipe-model"
           className="select"
@@ -163,10 +161,9 @@ export default function FipeLookupForm() {
             <option key={m.codigo} value={m.codigo}>{m.nome}</option>
           ))}
         </select>
-      </div>
+      </Field>
 
-      <div className="field">
-        <label className="field-label" htmlFor="fipe-year">Ano/combustível</label>
+      <Field label="Ano/combustível" htmlFor="fipe-year">
         <select
           id="fipe-year"
           className="select"
@@ -179,7 +176,7 @@ export default function FipeLookupForm() {
             <option key={y.codigo} value={y.codigo}>{y.nome}</option>
           ))}
         </select>
-      </div>
+      </Field>
 
       {error && <div className="alert alert-danger">{error}</div>}
 

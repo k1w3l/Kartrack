@@ -3,6 +3,7 @@ import { Bar, Doughnut, Line } from 'react-chartjs-2'
 import { ArcElement, BarElement, CategoryScale, Chart as ChartJS, Legend, LinearScale, LineElement, PointElement, Tooltip } from 'chart.js'
 import api from '../api'
 import Icon from '../components/Icon'
+import MetricCard from '../components/MetricCard'
 import { useUI } from '../components/UIProvider'
 import {
   buildTco,
@@ -97,16 +98,6 @@ function ChartEmptyState({ message }) {
     <div className="chart-empty" style={{ minHeight: 180 }}>
       <Icon name="chart" size={28} />
       <span>{message}</span>
-    </div>
-  )
-}
-
-function MetricCard({ icon, title, value, hint }) {
-  return (
-    <div className="metric-card">
-      <div className="label"><Icon name={icon} size={14} />{title}</div>
-      <div className="value">{value}</div>
-      {hint ? <p className="muted small metric-hint">{hint}</p> : null}
     </div>
   )
 }
@@ -308,16 +299,48 @@ export default function ReportsPage({ vehicleId, darkMode }) {
 
   return (
     <div className="stack-lg" id="reports-print-area">
-      <div className="card">
-        <h2 className="section-title"><Icon name="filter" size={16} />Filtro de período</h2>
-        <div className="cluster">
+      <div className="card reports-toolbar">
+        <label className="field">
+          <span className="field-label">Período</span>
           <select className="select" value={periodMode} onChange={(e) => setPeriodMode(e.target.value)}>
-            <option value="mes">Mês/ano</option><option value="periodo">Período</option><option value="historico">Histórico completo</option>
+            <option value="mes">Mês/ano</option>
+            <option value="periodo">Período</option>
+            <option value="historico">Histórico completo</option>
           </select>
-          {periodMode === 'mes' && (<><select className="select" style={{ maxWidth: 140 }} value={month} onChange={(e) => setMonth(e.target.value)}>{Array.from({ length: 12 }).map((_, i) => { const m = String(i + 1).padStart(2, '0'); return <option key={m} value={m}>{m}</option> })}</select><select className="select" style={{ maxWidth: 140 }} value={year} onChange={(e) => setYear(e.target.value)}>{Array.from({ length: 8 }).map((_, i) => { const y = String(new Date().getFullYear() - i); return <option key={y} value={y}>{y}</option> })}</select></>)}
-          {periodMode === 'periodo' && (<><input className="input" style={{ maxWidth: 180 }} type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} /><input className="input" style={{ maxWidth: 180 }} type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} /></>)}
-          <button type="button" className="btn btn-ghost" onClick={exportPdf}><Icon name="fileDown" size={16} />Exportar PDF</button>
-        </div>
+        </label>
+        {periodMode === 'mes' && (
+          <>
+            <label className="field">
+              <span className="field-label">Mês</span>
+              <select className="select" value={month} onChange={(e) => setMonth(e.target.value)}>
+                {Array.from({ length: 12 }).map((_, i) => { const m = String(i + 1).padStart(2, '0'); return <option key={m} value={m}>{m}</option> })}
+              </select>
+            </label>
+            <label className="field">
+              <span className="field-label">Ano</span>
+              <select className="select" value={year} onChange={(e) => setYear(e.target.value)}>
+                {Array.from({ length: 8 }).map((_, i) => { const y = String(new Date().getFullYear() - i); return <option key={y} value={y}>{y}</option> })}
+              </select>
+            </label>
+          </>
+        )}
+        {periodMode === 'periodo' && (
+          <>
+            <label className="field">
+              <span className="field-label">De</span>
+              <input className="input" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+            </label>
+            <label className="field">
+              <span className="field-label">Até</span>
+              <input className="input" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+            </label>
+          </>
+        )}
+        <label className="check-row">
+          <input type="checkbox" checked={includeDepreciation} onChange={(e) => setIncludeDepreciation(e.target.checked)} />
+          Incluir depreciação
+        </label>
+        <button type="button" className="btn btn-ghost" onClick={exportPdf}><Icon name="fileDown" size={16} />PDF</button>
       </div>
 
       <div className="reports-tabs" role="tablist" aria-label="Tipos de relatório">
@@ -337,17 +360,7 @@ export default function ReportsPage({ vehicleId, darkMode }) {
 
       {activeTab === 'custo' && (
         <div className="stack-lg" role="tabpanel">
-          <div className="cluster cluster-spread">
-            <h2 className="section-title" style={{ margin: 0 }}><Icon name="banknote" size={16} />Custo real</h2>
-            <label className="check-row">
-              <input
-                type="checkbox"
-                checked={includeDepreciation}
-                onChange={(e) => setIncludeDepreciation(e.target.checked)}
-              />
-              Incluir depreciação
-            </label>
-          </div>
+          <h2 className="section-title" style={{ margin: 0 }}><Icon name="banknote" size={16} />Custo real</h2>
 
           <div className="metric-grid">
             <MetricCard icon="banknote" title="Custo real" value={brl.format(tco.realCost)} />

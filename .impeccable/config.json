@@ -69,6 +69,24 @@
         "value": "1.6rem",
         "createdAt": "2026-08-19T05:41:42.034Z",
         "reason": "Incumbent: preço FIPE na tela de veículo, display vizinho do KPI"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#0f172a",
+        "createdAt": "2026-08-25T00:29:42.367Z",
+        "reason": "Print stylesheet dos relatórios (papel), não chrome da UI"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#dbe2ee",
+        "createdAt": "2026-08-25T00:29:42.389Z",
+        "reason": "Print stylesheet dos relatórios (papel), não chrome da UI"
+      },
+      {
+        "rule": "design-system-radius",
+        "value": "12px",
+        "createdAt": "2026-08-25T00:29:42.412Z",
+        "reason": "Print stylesheet dos relatórios (papel); UI usa 10/14"
       }
     ]
   }

@@ -2,8 +2,19 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api'
 import { useUI } from '../components/UIProvider'
-import Icon from '../components/Icon'
+import FilterSheet from '../components/FilterSheet'
+import Icon, { recordIconName } from '../components/Icon'
+import MetricCard from '../components/MetricCard'
+import OverflowMenu from '../components/OverflowMenu'
 import { ButtonSpinner } from '../components/Loading'
+
+const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
+
+function formatTipoRegistro(tipo) {
+  const t = String(tipo || '').trim().toLowerCase()
+  if (!t) return 'Registro'
+  return t.charAt(0).toUpperCase() + t.slice(1)
+}
 
 const COMMON_BULK_FIELDS = [
   { value: 'data', label: 'Data', input: 'date', apiField: 'data' },
@@ -61,6 +72,7 @@ export default function RecordsPage({ vehicleId }) {
   const [loadError, setLoadError] = useState('')
   const [selectedIds, setSelectedIds] = useState([])
   const [page, setPage] = useState(1)
+  const [filterOpen, setFilterOpen] = useState(false)
 
   const loadTimeline = async () => {
     if (!vehicleId) return
@@ -246,6 +258,10 @@ export default function RecordsPage({ vehicleId }) {
     toast.success('Cadastro excluído.')
   }
 
+  const editRecord = (record) => {
+    navigate(record.tipo_registro === 'abastecimento' ? `/abastecimento?edit=${record.id}` : `/despesa?edit=${record.id}`)
+  }
+
   if (!vehicleId) {
     return <div className="alert alert-info">Defina um veículo padrão para usar o menu Registros.</div>
   }
@@ -254,33 +270,25 @@ export default function RecordsPage({ vehicleId }) {
     <div className="stack-lg">
       <h1 className="page-title"><Icon name="folderOpen" />Registros</h1>
 
-      <div className="records-summary">
-        <SummaryCard icon="list" label="Total visível" value={filteredRecords.length} />
-        <SummaryCard icon="checkCheck" label="Selecionados" value={selectedRecords.length} />
-        <SummaryCard icon="fuel" label="Abastecimentos" value={filteredRecords.filter((record) => record.tipo_registro === 'abastecimento').length} />
-        <SummaryCard icon="receipt" label="Despesas" value={filteredRecords.filter((record) => record.tipo_registro !== 'abastecimento').length} />
+      <div className="timeline-toolbar">
+        <button type="button" className="btn btn-primary" aria-expanded={filterOpen} aria-haspopup="dialog" onClick={() => setFilterOpen(true)}>
+          <Icon name="filter" size={16} />
+          Filtrar
+          {bulkFilter !== 'todos' ? <span className="filter-count">1</span> : null}
+        </button>
+        <p className="muted small timeline-toolbar-summary">{bulkFilter === 'todos' ? 'Todos os tipos' : formatTipoRegistro(bulkFilter)}</p>
+      </div>
+
+      <div className="metric-grid" role="list">
+        <MetricCard icon="list" title="Total visível" value={filteredRecords.length} />
+        <MetricCard icon="checkCheck" title="Selecionados" value={selectedRecords.length} />
+        <MetricCard icon="fuel" title="Abastecimentos" value={filteredRecords.filter((record) => record.tipo_registro === 'abastecimento').length} />
+        <MetricCard icon="receipt" title="Despesas" value={filteredRecords.filter((record) => record.tipo_registro !== 'abastecimento').length} />
       </div>
 
       <div className="card">
         <h2 className="section-title"><Icon name="layers" size={16} />Edição em massa</h2>
         <div className="records-bulk-form">
-          <div className="field">
-            <label className="field-label">Filtro de tipo</label>
-            <select className="select" value={bulkFilter} onChange={(e) => setBulkFilter(e.target.value)}>
-              <option value="todos">Todos</option>
-              <option value="abastecimento">Abastecimento</option>
-              <option value="manutenção">Manutenção</option>
-              <option value="multa">Multa</option>
-              <option value="financiamento">Financiamento</option>
-              <option value="impostos">Impostos</option>
-              <option value="seguro">Seguro</option>
-              <option value="acessórios">Acessórios</option>
-              <option value="estacionamento">Estacionamento</option>
-              <option value="estética">Estética</option>
-              <option value="pedágio">Pedágio</option>
-              <option value="km inicial">KM inicial</option>
-            </select>
-          </div>
           <div className="field">
             <label className="field-label">Campo</label>
             <select className="select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
@@ -306,52 +314,42 @@ export default function RecordsPage({ vehicleId }) {
       </div>
 
       <div className="card">
-        <h2 className="section-title"><Icon name="squarePen" size={16} />Editar registros</h2>
+        <div className="cluster cluster-spread">
+          <h2 className="section-title" style={{ marginBottom: 0 }}><Icon name="squarePen" size={16} />Editar registros</h2>
+          <label className="check">
+            <input
+              type="checkbox"
+              aria-label="Selecionar registros desta página"
+              checked={!!displayedRecords.length && displayedRecords.every((record) => selectedIds.includes(`${record.tipo_registro}:${record.id}`))}
+              onChange={toggleSelectAll}
+            />
+            Página
+          </label>
+        </div>
         {filteredRecords.length > RECORDS_PAGE_SIZE && (
           <p className="muted small">Mostrando {pageStart}–{pageEnd} de {filteredRecords.length} registros</p>
         )}
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th><input type="checkbox" aria-label="Selecionar registros desta página" checked={!!displayedRecords.length && displayedRecords.every((record) => selectedIds.includes(`${record.tipo_registro}:${record.id}`))} onChange={toggleSelectAll} /></th>
-                <th>Registro</th>
-                <th>Data</th>
-                <th>Km</th>
-                <th>Valor</th>
-                <th>Descrição</th>
-                <th className="end">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {displayedRecords.map((record) => (
-                <tr key={`${record.tipo_registro}-${record.id}`}>
-                  <td><input type="checkbox" checked={selectedIds.includes(`${record.tipo_registro}:${record.id}`)} onChange={() => toggleSelected(record)} /></td>
-                  <td>
-                    <div className="stack">
-                      <span className={`badge${record.tipo_registro === 'abastecimento' ? ' badge-accent' : ''}`}>{record.tipo_registro}</span>
-                      <span className="muted small">ID #{record.id}</span>
-                    </div>
-                  </td>
-                  <td>{record.data}</td>
-                  <td>{record.quilometragem ? `${Number(record.quilometragem).toFixed(0)} km` : '-'}</td>
-                  <td className="num">R$ {Number(record.valor || 0).toFixed(2)}</td>
-                  <td>{record.descricao || '-'}</td>
-                  <td className="end">
-                    <div className="cluster cluster-end">
-                      <button type="button" className="btn btn-sm btn-accent" onClick={() => navigate(record.tipo_registro === 'abastecimento' ? `/abastecimento?edit=${record.id}` : `/despesa?edit=${record.id}`)}>
-                        <Icon name="pencil" size={14} />Editar
-                      </button>
-                      <button type="button" className="btn btn-sm btn-danger" onClick={() => deleteRecords([record])}>
-                        <Icon name="trash" size={14} />Excluir
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {!filteredRecords.length && <tr><td colSpan={7} className="muted">Nenhum registro encontrado para o filtro.</td></tr>}
-            </tbody>
-          </table>
+        <div className="timeline-log">
+          {displayedRecords.map((record) => (
+            <div className="hit-row" key={`${record.tipo_registro}-${record.id}`}>
+              <input type="checkbox" checked={selectedIds.includes(`${record.tipo_registro}:${record.id}`)} onChange={() => toggleSelected(record)} aria-label={`Selecionar ${formatTipoRegistro(record.tipo_registro)} #${record.id}`} />
+              <button type="button" className="timeline-hit" onClick={() => editRecord(record)}>
+                <div className="timeline-main">
+                  <strong className="cluster"><Icon name={recordIconName(record.tipo_registro)} size={16} />{formatTipoRegistro(record.tipo_registro)}</strong>
+                  {record.quilometragem ? <span className="num">{Number(record.quilometragem).toFixed(0)} km</span> : null}
+                  <span className="timeline-valor">{brl.format(record.valor || 0)}</span>
+                </div>
+                <p className="muted small">{[record.data, record.descricao].filter(Boolean).join(' • ') || `ID #${record.id}`}</p>
+              </button>
+              <OverflowMenu
+                items={[
+                  { label: 'Editar', icon: 'squarePen', onClick: () => editRecord(record) },
+                  { label: 'Excluir', icon: 'trash', danger: true, onClick: () => deleteRecords([record]) },
+                ]}
+              />
+            </div>
+          ))}
+          {!filteredRecords.length && <p className="muted">Nenhum registro encontrado para o filtro.</p>}
         </div>
         {filteredRecords.length > RECORDS_PAGE_SIZE && (
           <div className="cluster cluster-spread records-pager">
@@ -386,6 +384,26 @@ export default function RecordsPage({ vehicleId }) {
           <Icon name="trash" size={16} />Excluir todos os registros cadastrados
         </button>
       </div>
+
+      <FilterSheet open={filterOpen} onClose={() => setFilterOpen(false)}>
+        <label className="field">
+          <span className="field-label">Tipo</span>
+          <select className="select" value={bulkFilter} onChange={(e) => setBulkFilter(e.target.value)}>
+            <option value="todos">Todos</option>
+            <option value="abastecimento">Abastecimento</option>
+            <option value="manutenção">Manutenção</option>
+            <option value="multa">Multa</option>
+            <option value="financiamento">Financiamento</option>
+            <option value="impostos">Impostos</option>
+            <option value="seguro">Seguro</option>
+            <option value="acessórios">Acessórios</option>
+            <option value="estacionamento">Estacionamento</option>
+            <option value="estética">Estética</option>
+            <option value="pedágio">Pedágio</option>
+            <option value="km inicial">KM inicial</option>
+          </select>
+        </label>
+      </FilterSheet>
     </div>
   )
 }
@@ -394,6 +412,7 @@ function DataTypeEditor({ field, values, parentOptions = [], onAdd, onRemove }) 
   const [newValue, setNewValue] = useState('')
   const [selectedId, setSelectedId] = useState('')
   const [parentValue, setParentValue] = useState('')
+  const [adding, setAdding] = useState(false)
 
   useEffect(() => {
     if (!values.some((item) => String(item.id) === String(selectedId))) {
@@ -407,6 +426,7 @@ function DataTypeEditor({ field, values, parentOptions = [], onAdd, onRemove }) 
   const submitNewValue = async () => {
     const created = await onAdd(newValue, parentValue)
     setNewValue('')
+    setAdding(false)
     if (created?.id) setSelectedId(String(created.id))
   }
 
@@ -428,7 +448,16 @@ function DataTypeEditor({ field, values, parentOptions = [], onAdd, onRemove }) 
         </select>
         <button
           type="button"
-          className="btn btn-sm btn-danger"
+          className="btn btn-ghost icon-btn"
+          aria-label={adding ? 'Cancelar cadastro' : `Cadastrar em ${field.label}`}
+          aria-expanded={adding}
+          onClick={() => setAdding((open) => !open)}
+        >
+          <Icon name={adding ? 'x' : 'plus'} />
+        </button>
+        <button
+          type="button"
+          className="btn btn-ghost icon-btn"
           disabled={!selectedItem}
           onClick={() => onRemove(selectedItem)}
           title="Excluir item selecionado"
@@ -437,7 +466,7 @@ function DataTypeEditor({ field, values, parentOptions = [], onAdd, onRemove }) 
           <Icon name="trash" size={16} />
         </button>
       </div>
-      {field.parentKey && (
+      {field.parentKey && adding && (
         <select
           className="select"
           value={parentValue}
@@ -450,23 +479,25 @@ function DataTypeEditor({ field, values, parentOptions = [], onAdd, onRemove }) 
           ))}
         </select>
       )}
-      <div className="inline-add">
-        <input
-          className="input"
-          value={newValue}
-          onChange={(e) => setNewValue(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              submitNewValue()
-            }
-          }}
-          placeholder={field.placeholder}
-        />
-        <button type="button" className="btn btn-sm btn-accent" onClick={submitNewValue}>
-          Adicionar
-        </button>
-      </div>
+      {adding && (
+        <div className="inline-add">
+          <input
+            className="input"
+            value={newValue}
+            onChange={(e) => setNewValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                submitNewValue()
+              }
+            }}
+            placeholder={field.placeholder}
+          />
+          <button type="button" className="btn btn-sm btn-accent" onClick={submitNewValue}>
+            Adicionar
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -490,15 +521,6 @@ function BulkValueInput({ field, value, onChange }) {
       onChange={(e) => onChange(e.target.value)}
       placeholder="Informe o novo valor"
     />
-  )
-}
-
-function SummaryCard({ icon, label, value }) {
-  return (
-    <div className="metric-card">
-      <div className="label"><Icon name={icon} size={14} />{label}</div>
-      <div className="value">{value}</div>
-    </div>
   )
 }
 

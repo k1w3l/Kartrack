@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../api'
 import { useUI } from '../components/UIProvider'
-import Field, { AutoGrowTextarea } from '../components/Field'
+import Field, { LookupSelect, AutoGrowTextarea } from '../components/Field'
 import Icon from '../components/Icon'
 import { ButtonSpinner } from '../components/Loading'
 
@@ -31,12 +31,6 @@ export default function FuelPage({ vehicleId }) {
   const [combustiveis, setCombustiveis] = useState(COMBUSTIVEIS_PADRAO)
   const [bandeiras, setBandeiras] = useState(BANDEIRAS_PADRAO)
   const [postos, setPostos] = useState([])
-  const [novoCombustivel, setNovoCombustivel] = useState('')
-  const [novaBandeira, setNovaBandeira] = useState('')
-  const [novoLocal, setNovoLocal] = useState('')
-  const [showNovoCombustivel, setShowNovoCombustivel] = useState(false)
-  const [showNovaBandeira, setShowNovaBandeira] = useState(false)
-  const [showNovoLocal, setShowNovoLocal] = useState(false)
 
   const [form, setForm] = useState({
     data: new Date().toISOString().slice(0, 10),
@@ -169,14 +163,25 @@ export default function FuelPage({ vehicleId }) {
         <Field label="Data" icon="calendar"><input className="input" type="date" value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} required /></Field>
         <Field label="Quilometragem do abastecimento" icon="route"><input className="input" type="number" inputMode="numeric" min="0" value={form.quilometragem} onChange={(e) => setForm({ ...form, quilometragem: e.target.value })} required /></Field>
         <Field label="Tipo de combustível" icon="droplets">
-          <select className="select" value={form.tipo_combustivel} onChange={(e) => setForm({ ...form, tipo_combustivel: e.target.value })}>{combustiveis.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}</select>
-          <button type="button" className="btn btn-link btn-sm" onClick={() => setShowNovoCombustivel((v) => !v)}>{showNovoCombustivel ? 'Cancelar novo combustível' : 'Cadastrar novo combustível'}</button>
-          {showNovoCombustivel && (
-            <div className="inline-add">
-              <input className="input" value={novoCombustivel} onChange={(e) => setNovoCombustivel(e.target.value)} placeholder="Ex.: GNV" />
-              <button type="button" className="btn btn-accent btn-sm" onClick={async () => { const value = novoCombustivel.trim(); if (!value) return; try { await api.post('/lookup', { category: 'fuel_type', value }); await loadCombustiveis(); setForm((prev) => ({ ...prev, tipo_combustivel: value })); setNovoCombustivel(''); setShowNovoCombustivel(false) } catch { toast.error('Combustível já cadastrado.') } }}>Adicionar</button>
-            </div>
-          )}
+          <LookupSelect
+            value={form.tipo_combustivel}
+            onChange={(tipo_combustivel) => setForm({ ...form, tipo_combustivel })}
+            options={combustiveis}
+            required
+            placeholder=""
+            addPlaceholder="Ex.: GNV"
+            addAriaLabel="Cadastrar novo combustível"
+            onAdd={async (value) => {
+              try {
+                await api.post('/lookup', { category: 'fuel_type', value })
+                await loadCombustiveis()
+                setForm((prev) => ({ ...prev, tipo_combustivel: value }))
+              } catch {
+                toast.error('Combustível já cadastrado.')
+                return false
+              }
+            }}
+          />
         </Field>
         <Field label="Litros abastecidos" icon="droplet"><input className="input" type="number" inputMode="decimal" min="0" step="0.01" value={form.litros} onChange={(e) => setForm({ ...form, litros: e.target.value })} required /></Field>
         <Field label="Valor total" icon="banknote"><input className="input" type="number" inputMode="decimal" min="0" step="0.01" value={form.valor_total} onChange={(e) => setForm({ ...form, valor_total: e.target.value })} required /></Field>
@@ -187,31 +192,51 @@ export default function FuelPage({ vehicleId }) {
           </label>
         </Field>
         <Field label="Bandeira" icon="flag">
-          <select className="select" value={form.bandeira} onChange={(e) => setForm({ ...form, bandeira: e.target.value, local: '' })}>{bandeiras.map((bandeira) => <option key={bandeira} value={bandeira}>{bandeira}</option>)}</select>
-          <button type="button" className="btn btn-link btn-sm" onClick={() => setShowNovaBandeira((v) => !v)}>{showNovaBandeira ? 'Cancelar nova bandeira' : 'Cadastrar nova bandeira'}</button>
-          {showNovaBandeira && (
-            <div className="inline-add">
-              <input className="input" value={novaBandeira} onChange={(e) => setNovaBandeira(e.target.value)} placeholder="Ex.: Ale" />
-              <button type="button" className="btn btn-accent btn-sm" onClick={async () => { const value = novaBandeira.trim(); if (!value) return; try { await api.post('/lookup', { category: 'fuel_brand', value }); await loadBandeiras(); setForm((prev) => ({ ...prev, bandeira: value, local: '' })); setNovaBandeira(''); setShowNovaBandeira(false) } catch { toast.error('Bandeira já cadastrada.') } }}>Adicionar</button>
-            </div>
-          )}
+          <LookupSelect
+            value={form.bandeira}
+            onChange={(bandeira) => setForm({ ...form, bandeira, local: '' })}
+            options={bandeiras}
+            required
+            placeholder=""
+            addPlaceholder="Ex.: Ale"
+            addAriaLabel="Cadastrar nova bandeira"
+            onAdd={async (value) => {
+              try {
+                await api.post('/lookup', { category: 'fuel_brand', value })
+                await loadBandeiras()
+                setForm((prev) => ({ ...prev, bandeira: value, local: '' }))
+              } catch {
+                toast.error('Bandeira já cadastrada.')
+                return false
+              }
+            }}
+          />
         </Field>
         <Field label="Local" icon="mapPin">
-          <select className="select" value={form.local} onChange={(e) => setForm({ ...form, local: e.target.value })} required>
-            <option value="">Selecione o local</option>
-            {locaisUnicos.map((local) => <option key={local} value={local}>{local}</option>)}
-          </select>
-          <button type="button" className="btn btn-link btn-sm" onClick={() => setShowNovoLocal((v) => !v)}>{showNovoLocal ? 'Cancelar novo local' : 'Cadastrar novo local'}</button>
-          {showNovoLocal && (
-            <div className="inline-add">
-              <input className="input" value={novoLocal} onChange={(e) => setNovoLocal(e.target.value)} placeholder="Ex.: Avenida Central, 123" />
-              <button type="button" className="btn btn-accent btn-sm" onClick={async () => { const value = novoLocal.trim(); if (!value || !form.bandeira) return; try { await api.post('/lookup', { category: 'fuel_location', value, parent_value: form.bandeira }); await loadLocais(form.bandeira); setForm((prev) => ({ ...prev, local: value })); setNovoLocal(''); setShowNovoLocal(false) } catch { toast.error('Local já cadastrado para esta bandeira.') } }}>Adicionar</button>
-            </div>
-          )}
+          <LookupSelect
+            value={form.local}
+            onChange={(local) => setForm({ ...form, local })}
+            options={locaisUnicos}
+            required
+            placeholder="Selecione o local"
+            addPlaceholder="Ex.: Avenida Central, 123"
+            addAriaLabel="Cadastrar novo local"
+            onAdd={async (value) => {
+              if (!form.bandeira) return
+              try {
+                await api.post('/lookup', { category: 'fuel_location', value, parent_value: form.bandeira })
+                await loadLocais(form.bandeira)
+                setForm((prev) => ({ ...prev, local: value }))
+              } catch {
+                toast.error('Local já cadastrado para esta bandeira.')
+                return false
+              }
+            }}
+          />
         </Field>
         <Field label="Descrição" icon="stickyNote" span><AutoGrowTextarea value={form.descricao} onChange={(value) => setForm({ ...form, descricao: value })} /></Field>
       </div>
-      <p style={{ marginTop: 16 }} className="cluster"><Icon name="calculator" size={16} />Valor do litro: <strong className="num">R$ {valorLitro.toFixed(2)}</strong></p>
+      <p className="cluster" style={{ marginTop: 16 }}><Icon name="calculator" size={16} />Valor do litro: <strong className="num">R$ {valorLitro.toFixed(2)}</strong></p>
       <div className="form-actions">
         <button type="submit" className="btn btn-primary" disabled={submitting}>
           {submitting ? <><ButtonSpinner />Salvando...</> : <><Icon name="save" size={16} />Salvar</>}

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import api from '../api'
 import { useUI } from '../components/UIProvider'
+import Field from '../components/Field'
 import Icon from '../components/Icon'
+import OverflowMenu from '../components/OverflowMenu'
 
 const defaultNewUser = { name: '', email: '', password: '' }
 
@@ -77,39 +79,37 @@ export default function SettingsPage({ user, onUserUpdated }) {
           <h2 className="section-title"><Icon name="users" size={16} />Gestão de usuários</h2>
 
           <div className="grid-2">
-            <div className="field">
-              <label className="field-label" htmlFor="new-user-name">Nome</label>
+            <Field label="Nome" htmlFor="new-user-name">
               <input id="new-user-name" className="input" placeholder="Nome" autoComplete="off" value={newUser.name} onChange={(e) => setNewUser((p) => ({ ...p, name: e.target.value }))} />
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="new-user-email">E-mail</label>
+            </Field>
+            <Field label="E-mail" htmlFor="new-user-email">
               <input id="new-user-email" className="input" placeholder="E-mail" type="email" inputMode="email" autoComplete="off" value={newUser.email} onChange={(e) => setNewUser((p) => ({ ...p, email: e.target.value }))} />
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="new-user-password">Senha</label>
+            </Field>
+            <Field label="Senha" htmlFor="new-user-password">
               <input id="new-user-password" className="input" placeholder="Senha" type="password" autoComplete="new-password" value={newUser.password} onChange={(e) => setNewUser((p) => ({ ...p, password: e.target.value }))} />
-            </div>
+            </Field>
             <div className="field"><button type="button" className="btn btn-primary w-full" onClick={createUser} aria-label="Adicionar usuário"><Icon name="plus" /></button></div>
           </div>
 
-          <div className="table-wrap">
-            <table className="table">
-              <thead><tr><th>Nome</th><th>E-mail</th><th>Admin</th><th>Ações</th></tr></thead>
-              <tbody>
-                {users.map((u) => (
-                  <tr key={u.id}>
-                    <td>{u.name}</td>
-                    <td>{u.email}</td>
-                    <td>{u.is_admin ? 'Sim' : 'Não'}</td>
-                    <td className="cluster">
-                      <button type="button" className="btn btn-sm btn-ghost" onClick={() => resetPassword(u.id)}><Icon name="key" size={14} />Senha</button>
-                      {!u.is_admin && <button type="button" className="btn btn-sm btn-danger" onClick={() => deleteUser(u.id)}><Icon name="trash" size={14} />Excluir</button>}
-                    </td>
-                  </tr>
-                ))}
-                {!users.length && <tr><td colSpan={4} className="muted">Nenhum usuário disponível.</td></tr>}
-              </tbody>
-            </table>
+          <div className="timeline-log">
+            {users.map((u) => (
+              <div className="hit-row is-plain" key={u.id}>
+                <div>
+                  <div className="timeline-main">
+                    <strong>{u.name}</strong>
+                    {u.is_admin ? <span className="badge badge-accent">Admin</span> : null}
+                  </div>
+                  <p className="muted small">{u.email}</p>
+                </div>
+                <OverflowMenu
+                  items={[
+                    { label: 'Redefinir senha', icon: 'key', onClick: () => resetPassword(u.id) },
+                    !u.is_admin && { label: 'Excluir', icon: 'trash', danger: true, onClick: () => deleteUser(u.id) },
+                  ]}
+                />
+              </div>
+            ))}
+            {!users.length && <p className="muted">Nenhum usuário disponível.</p>}
           </div>
         </div>
       )}
@@ -117,27 +117,24 @@ export default function SettingsPage({ user, onUserUpdated }) {
       <div className="card">
         <h2 className="section-title"><Icon name="languages" size={16} />Idioma, unidades e moeda</h2>
         <div className="grid-2">
-          <div className="field">
-            <label className="field-label">Idioma</label>
+          <Field label="Idioma">
             <select className="select" value={preferences.language} onChange={(e) => setPreferences((p) => ({ ...p, language: e.target.value }))}>
               <option value="pt-BR">Português (Brasil)</option>
               <option value="en-US">English (US)</option>
             </select>
-          </div>
-          <div className="field">
-            <label className="field-label">Unidades</label>
+          </Field>
+          <Field label="Unidades">
             <select className="select" value={preferences.unit_system} onChange={(e) => setPreferences((p) => ({ ...p, unit_system: e.target.value }))}>
               <option value="metric">Métrico (km, L)</option>
               <option value="imperial">Imperial (mi, gal)</option>
             </select>
-          </div>
-          <div className="field">
-            <label className="field-label">Moeda</label>
+          </Field>
+          <Field label="Moeda">
             <select className="select" value={preferences.currency} onChange={(e) => setPreferences((p) => ({ ...p, currency: e.target.value }))}>
               <option value="BRL">Real (BRL)</option>
               <option value="USD">Dollar (USD)</option>
             </select>
-          </div>
+          </Field>
         </div>
         <div className="form-actions cluster-end">
           <button type="button" className="btn btn-primary" onClick={savePreferences}><Icon name="save" size={16} />Salvar preferências</button>
